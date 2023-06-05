@@ -7,12 +7,14 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8"
 
 setup(
     name="neuroimager",
-    version="0.0.3",
+    version="0.0.4",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    url="https://github.com/Wetiqe/neuroimager",
+
     packages=find_packages(),
     install_requires=[
         "numpy",
