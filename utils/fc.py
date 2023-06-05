@@ -1,10 +1,11 @@
 import numpy as np
-import pandas as pd
 import math
 
 
-def filt_fcs(fcs, coords, network_col='Network', excludes: list = None, includes: list = None):
-    '''Filter FC matrix based on network labels
+def filt_fcs(
+    fcs, coords, network_col="Network", excludes: list = None, includes: list = None
+):
+    """Filter FC matrix based on network labels
     :param fcs: A numpy matrix shaped (n_subjs, n_nodes, n_nodes) representing the functional connectivity data.
     :param coords: A DataFrame containing the coordinates and network labels for each node.
     :param network_col: A string representing the column name in the coords DataFrame that contains the network labels. Default is 'Network'.
@@ -14,7 +15,7 @@ def filt_fcs(fcs, coords, network_col='Network', excludes: list = None, includes
 
     This function filters the input functional connectivity matrix based on the specified network labels.
     It can be used to include or exclude specific networks from the analysis.
-    '''
+    """
     if includes is not None and excludes is not None:
         raise ValueError("Only one of 'includes' and 'excludes' can be specified.")
     elif excludes is None:
@@ -33,10 +34,10 @@ def filt_fcs(fcs, coords, network_col='Network', excludes: list = None, includes
         ind = get_coords_index(coords, network_col, excludes)
         fcs = np.delete(fcs, ind, axis=1)
         fcs = np.delete(fcs, ind, axis=2)
-    
+
     return fcs
-    
-    
+
+
 def flatten_lower_triangular(matrix):
     """
     This function takes a 2D or 3D numpy array representing one or multiple square matrices as input and returns a 2D numpy array
@@ -55,7 +56,9 @@ def flatten_lower_triangular(matrix):
     elif len(matrix.shape) != 3:
         raise ValueError("Input matrix must be 2D or 3D")
 
-    tril_matrices = np.array([np.tril(fc, k=-1) for fc in matrix]).reshape(matrix.shape[0], -1)
+    tril_matrices = np.array([np.tril(fc, k=-1) for fc in matrix]).reshape(
+        matrix.shape[0], -1
+    )
     flat_matrices = tril_matrices[:, ~np.all(tril_matrices == 0, axis=0)]
 
     return flat_matrices
@@ -89,6 +92,7 @@ def unflatten_lower_triangular(flat_matrices, n):
             n1 = (1 + math.sqrt(discriminant)) / 2
             n2 = (1 - math.sqrt(discriminant)) / 2
             return n1, n2
+
     n = int(calculate_orig_n(n)[0])
     tril_indices = np.tril_indices(n, k=-1)
     original_shape_matrices = np.zeros((m, n, n))
