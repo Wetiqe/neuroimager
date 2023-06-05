@@ -7,7 +7,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8"
 
 setup(
     name="neuroimager",
-    version="0.0.2",
+    version="0.0.3",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
