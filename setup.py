@@ -5,6 +5,10 @@ import os
 with open(os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
+# Read the contents of the requirements.txt file
+with open("requirements.txt") as f:
+    requirements = f.read().splitlines()
+
 setup(
     name="neuroimager",
     version="0.0.4",
@@ -16,14 +20,7 @@ setup(
     url="https://github.com/Wetiqe/neuroimager",
 
     packages=find_packages(),
-    install_requires=[
-        "numpy",
-        "pandas",
-        "matplotlib",
-        "seaborn",
-        "scipy",
-        "sklearn",
-    ],
+    install_requires=requirements,
     classifiers=[
         "Development Status :: 1 - Planning",
         "Programming Language :: Python :: 3",
