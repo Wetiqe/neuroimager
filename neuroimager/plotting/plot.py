@@ -5,34 +5,35 @@ from scipy.stats import gaussian_kde
 
 
 def update_matplotlib_fontsize():
-    parameters = {'axes.labelsize': 20,
-                 'axes.titlesize': 20,
-                 'figure.titlesize':20,
-                 'xtick.labelsize':20,
-                 'ytick.labelsize':20,
-                 'legend.fontsize':15,
-                 'legend.title_fontsize':16,
-                 'axes.titleweight':'bold',
-                 'axes.labelweight': 'bold',
-                 'figure.titleweight':'bold',
-                 'font.weight':'bold',
-                 'font.sans-serif':'Arial'}
+    parameters = {
+        "axes.labelsize": 20,
+        "axes.titlesize": 20,
+        "figure.titlesize": 20,
+        "xtick.labelsize": 20,
+        "ytick.labelsize": 20,
+        "legend.fontsize": 15,
+        "legend.title_fontsize": 16,
+        "axes.titleweight": "bold",
+        "axes.labelweight": "bold",
+        "figure.titleweight": "bold",
+        "font.weight": "bold",
+        "font.sans-serif": "Arial",
+    }
     plt.rcParams.update(parameters)
-        
 
-def get_sig(df,feature):
-    sig = df.loc[scale,'p value']
-    symbol = ''
-    if  0.01 < sig < 0.05:
-        symbol = '*'
-    elif 0.001< sig <=0.01:
-        symbol = '**'
-    elif sig <=0.001:
-        symbol = '***'
-    elif 0.05 <= sig <0.10:
-        symbol = '^'
+
+def get_sig(df, feature):
+    sig = df.loc[scale, "p value"]
+    symbol = ""
+    if 0.01 < sig < 0.05:
+        symbol = "*"
+    elif 0.001 < sig <= 0.01:
+        symbol = "**"
+    elif sig <= 0.001:
+        symbol = "***"
+    elif 0.05 <= sig < 0.10:
+        symbol = "^"
     return (sig, symbol)
-    
 
 
 def density_scatter(
@@ -62,7 +63,8 @@ def density_scatter(
         plt.show()
 
     return fig, ax
-    
+
+
 def plot_time_series(
     time_series,
     n_samples=None,
@@ -73,7 +75,7 @@ def plot_time_series(
     filename=None,
 ):
     """Plot a time series with channel separation.
-    ***This is a function modified from else where. Add the source*** 
+    ***This is a function modified from else where. Add the source***
     Parameters
     ----------
     time_series : numpy.ndarray
@@ -152,5 +154,4 @@ def plot_time_series(
     if filename is not None:
         save(fig, filename)
 
-    return fig, 
-
+    return (fig,)

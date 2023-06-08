@@ -48,7 +48,7 @@ def partial_corrs(
     Notes
     -----
     This function computes partial correlations between pairs of variables, controlling for specified covariates.
-    P-values are corrected for multiple comparisons using the specified method. 
+    P-values are corrected for multiple comparisons using the specified method.
     The function supports both Pearson and Spearman correlation methods, as well as semi-partial correlations.
 
     References
