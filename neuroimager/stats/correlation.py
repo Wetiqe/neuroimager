@@ -4,15 +4,15 @@ import pandas as pd
 
 
 def partial_corrs(
-    data,
-    x_labels: list = None,
-    y_labels: list = None,
-    covariates: list = None,
-    method="auto",
-    semi=False,
-    alternative="two-sided",
-    correct_p="global",
-    correct_method="holm",
+        data,
+        x_labels: list = None,
+        y_labels: list = None,
+        covars: list = None,
+        method="auto",
+        semi=False,
+        alternative="two-sided",
+        correct_p="global",
+        correct_method="holm",
 ):
     """
     Compute partial correlations between pairs of variables, controlling for specified covariates.
@@ -30,13 +30,19 @@ def partial_corrs(
     method : str, optional
         The correlation method to use. Options are 'auto', 'pearson', or 'spearman'. Default is 'auto'.
     semi : bool or str, optional
-        If True, compute semi-partial correlation. If 'x', control for covariates only in x. If 'y', control for covariates only in y. Default is False.
+        If True, compute semi-partial correlation.
+        If 'x', control for covariates only in x.
+        If 'y', control for covariates only in y. Default is False.
     alternative : str, optional
-        The alternative hypothesis for the correlation test. Options are 'two-sided', 'greater', or 'less'. Default is 'two-sided'.
+        The alternative hypothesis for the correlation test. Options are 'two-sided', 'greater', or 'less'.
+        Default is 'two-sided'.
     correct_p : str, optional
-        The correction method for multiple comparisons. Options are 'global', 'IVs', or any other value for no correction. Default is 'global'.
+        The correction method for multiple comparisons. Options are 'global', 'IVs', or any other value for no correction.
+        Default is 'global'.
     correct_method : str, optional
-        The method to use for multiple comparison correction. Options are 'holm', 'bonferroni', 'fdr_bh', 'fdr_by', 'fdr_tsbh', 'fdr_tsbky', 'sidak', or 'none'. Default is 'holm'.
+        The method to use for multiple comparison correction.
+        Options are 'holm', 'bonferroni', 'fdr_bh', 'fdr_by', 'fdr_tsbh', 'fdr_tsbky', 'sidak', or 'none'.
+        Default is 'holm'.
 
     Returns
     -------
@@ -77,7 +83,7 @@ def partial_corrs(
         for x_label in IVs:
             # Create a df only contains the variables using now
             # This is a good practice when using pingouin
-            df = data[[x_label, y_label] + covariates]
+            df = data[[x_label, y_label] + covars]
             df = df.dropna(how="any", axis=0)  # drop any row with missing value
 
             # Select correlation method based on multivariate normality test result
@@ -94,7 +100,7 @@ def partial_corrs(
                     data=df,
                     x=x_label,
                     y=y_label,
-                    covar=covariates,
+                    covar=covars,
                     alternative=alternative,
                     method=method_to_use,
                 ).round(3)
@@ -103,7 +109,7 @@ def partial_corrs(
                     data=df,
                     x=x_label,
                     y=y_label,
-                    x_covar=covariates,
+                    x_covar=covars,
                     alternative=alternative,
                     method=method_to_use,
                 ).round(3)
@@ -112,7 +118,7 @@ def partial_corrs(
                     data=df,
                     x=x_label,
                     y=y_label,
-                    y_covar=covariates,
+                    y_covar=covars,
                     alternative=alternative,
                     method=method_to_use,
                 ).round(3)

@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+
+
 def convert_hmm(hmm):
     """
     ***Only tested for FMRI DATA***
@@ -273,18 +277,13 @@ def parse_chronnectome(vpath, subj_num, K_state, timepoints):
     Returns
     -------
     results : dict
-        A dictionary containing DataFrames for each visitation metric, with keys corresponding to the metric names and values being the DataFrames. The metrics include:
+        A dictionary containing DataFrames for each visitation metric, with keys corresponding to the metric names
+        The metrics include:
         - vpath_fo: Fractional Occupancy
         - vpath_visit: Visitation counts
         - vpath_lifetime: State lifetimes
         - vpath_interval: State intervals
         - vpath_switch: Switching rate
-
-    Notes
-    -----
-    This function parses chronnectome data and computes various visitation metrics for each subject.
-    It takes the visitation paths for all subjects, the number of subjects, the number of states in HMM, and the number of timepoints for each subject as input.
-    The function returns a dictionary containing DataFrames for each visitation metric, with keys corresponding to the metric names and values being the DataFrames.
 
     """
     funcs = [vpath_fo, vpath_visit, vpath_switch, vpath_lifetime, vpath_interval]
@@ -294,7 +293,7 @@ def parse_chronnectome(vpath, subj_num, K_state, timepoints):
         for i in range(subj_num):
             subj_vpath = vpath[timepoints * i : timepoints * (i + 1)]
             subj_df = func(subj_vpath, K_state)
-            subj_df.index = [subjects_id[i]]
+            subj_df.index = i
             dfs.append(subj_df)
         if func.__name__ in ["vpath_lifetime", "vpath_interval"]:
             results[func.__name__] = get_mean_chronnectome(pd.concat(dfs))

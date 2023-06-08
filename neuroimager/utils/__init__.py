@@ -7,7 +7,7 @@ from neuroimager.utils.atlas import (
 from neuroimager.utils.fc import (
     flatten_lower_triangular,
     unflatten_lower_triangular,
-    filt_fcs,
+    filter_fcs,
 )
 
 __all__ = [
@@ -17,5 +17,5 @@ __all__ = [
     "filter_rois",
     "flatten_lower_triangular",
     "unflatten_lower_triangular",
-    "filt_fcs",
+    "filter_fcs",
 ]

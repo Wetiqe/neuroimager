@@ -2,13 +2,12 @@ import numpy as np
 import math
 
 
-def filt_fcs(
-    fcs, coords, network_col="Network", excludes: list = None, includes: list = None
+def filter_fcs(
+    fcs: np.array, network_labels: list, excludes: list = None, includes: list = None
 ):
     """Filter FC matrix based on network labels
-    :param fcs: A numpy matrix shaped (n_subjs, n_nodes, n_nodes) representing the functional connectivity data.
-    :param coords: A DataFrame containing the coordinates and network labels for each node.
-    :param network_col: A string representing the column name in the coords DataFrame that contains the network labels. Default is 'Network'.
+    :param fcs: A numpy matrix shaped (n_subjects, n_nodes, n_nodes) representing the functional connectivity data.
+    :param network_labels: A list containing the network labels for each node.
     :param excludes: A list of network labels to exclude from the filtered FC matrix. Default is None.
     :param includes: A list of network labels to include in the filtered FC matrix. Default is None.
     :return: A filtered numpy matrix containing only the desired network labels.
@@ -23,55 +22,76 @@ def filt_fcs(
     elif includes is None:
         includes = []
 
-    def get_coords_index(coords, col, values):
-        return coords[coords[col].isin(values)].index
+    def get_index(labels: list, desired: list):
+        return [i for i, label in enumerate(labels) if label in desired]
 
     if includes:
-        ind = get_coords_index(coords, network_col, includes)
+        ind = get_index(network_labels, includes)
         indexer = np.ix_(np.arange(fcs.shape[0]), ind, ind)
         fcs = fcs[indexer]
     elif excludes:
-        ind = get_coords_index(coords, network_col, excludes)
+        ind = get_index(network_labels, excludes)
         fcs = np.delete(fcs, ind, axis=1)
         fcs = np.delete(fcs, ind, axis=2)
 
     return fcs
 
 
+def extract_bipartite_matrix(
+    matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
+):
+    """Extract the bipartite part of a functional connectivity matrix.
+
+    :param matrix: A numpy matrix shaped (n_subjs, n_nodes, n_nodes) representing the functional connectivity data.
+    :param network_labels: A list containing the network labels for each node.
+    :param bp1_labels: A list of network labels for Network 1 nodes.
+    :param bp2_labels: A list of network labels for other networks' nodes.
+    :return: A numpy matrix containing the desired bipartite part of the functional connectivity matrix.
+    """
+    # the network_labels should have same length as nodes in the matrix
+    if len(network_labels) != matrix.shape[1]:
+        raise ValueError(
+            "The length of network_labels should be equal to the number of nodes in the matrix"
+        )
+
+    network1_indices = np.isin(network_labels, bp1_labels)
+    other_networks_indices = np.isin(network_labels, bp2_labels)
+
+    bipartite_matrix = matrix[np.ix_(network1_indices, other_networks_indices)]
+
+    return bipartite_matrix
+
+
 def flatten_lower_triangular(matrix):
     """
-    This function takes a 2D or 3D numpy array representing one or multiple square matrices as input and returns a 2D numpy array
-    where each row corresponds to the flattened lower triangular part of a matrix in the input. The diagonal and upper triangular
-    elements of each input matrix are excluded from the output.
+    This function takes a 2D or 3D numpy array returns a 2D numpy array.
+    where each row corresponds to the flattened lower triangular part (diagonal removed) of a matrix in the input.
 
     Parameters:
     matrix (numpy.ndarray): A 2D or 3D numpy array representing one or multiple square matrices.
 
     Returns:
-    numpy.ndarray: A 2D numpy array where each row corresponds to the flattened lower triangular part of a matrix in the input,
-    with diagonal and upper triangular elements excluded.
+    numpy.ndarray:  A 2D numpy array representing one or multiple flattened lower triangular matrices (diagonal removed)
     """
     if len(matrix.shape) == 2:
         matrix = np.array([matrix])
     elif len(matrix.shape) != 3:
         raise ValueError("Input matrix must be 2D or 3D")
 
-    tril_matrices = np.array([np.tril(fc, k=-1) for fc in matrix]).reshape(
+    tri_matrices = np.array([np.tril(fc, k=-1) for fc in matrix]).reshape(
         matrix.shape[0], -1
     )
-    flat_matrices = tril_matrices[:, ~np.all(tril_matrices == 0, axis=0)]
+    flat_matrices = tri_matrices[:, ~np.all(tri_matrices == 0, axis=0)]
 
     return flat_matrices
 
 
-def unflatten_lower_triangular(flat_matrices, n):
+def unflatten_lower_triangular(flat_matrices):
     """
     Reconstructs the lower triangular matrices from their flattened representation.
 
     Args:
-        flat_matrices: A 2D numpy array representing one or multiple flattened lower triangular matrices.
-        n: The original size of the matrices.
-
+        flat_matrices: A 1D or 2D numpy array representing flattened lower triangular matrices (without diagonal).
     Returns:
         A 3D numpy array representing one or multiple lower triangular matrices in their original shape.
 
@@ -84,8 +104,8 @@ def unflatten_lower_triangular(flat_matrices, n):
         raise ValueError("Input matrix must be 2D")
     m, n = flat_matrices.shape
 
-    def calculate_orig_n(n):
-        discriminant = 1 + 8 * n
+    def calculate_orig_n(n_nodes):
+        discriminant = 1 + 8 * n_nodes
         if discriminant < 0:
             raise ValueError("No real solution for n")
         else:
@@ -94,11 +114,11 @@ def unflatten_lower_triangular(flat_matrices, n):
             return n1, n2
 
     n = int(calculate_orig_n(n)[0])
-    tril_indices = np.tril_indices(n, k=-1)
+    tri_indices = np.tril_indices(n, k=-1)
     original_shape_matrices = np.zeros((m, n, n))
 
     for i in range(m):
-        original_shape_matrices[i][tril_indices] = flat_matrices[i, :]
+        original_shape_matrices[i][tri_indices] = flat_matrices[i, :]
 
     if m == 1:
         return original_shape_matrices[0]

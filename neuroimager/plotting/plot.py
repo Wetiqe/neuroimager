@@ -22,8 +22,7 @@ def update_matplotlib_fontsize():
     plt.rcParams.update(parameters)
 
 
-def get_sig(df, feature):
-    sig = df.loc[scale, "p value"]
+def get_sig(sig):
     symbol = ""
     if 0.01 < sig < 0.05:
         symbol = "*"
@@ -33,7 +32,8 @@ def get_sig(df, feature):
         symbol = "***"
     elif 0.05 <= sig < 0.10:
         symbol = "^"
-    return (sig, symbol)
+
+    return sig, symbol
 
 
 def density_scatter(
@@ -117,14 +117,14 @@ def plot_time_series(
     if fig_kwargs is None:
         fig_kwargs = default_fig_kwargs
     else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
-
+        # fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        pass
     default_plot_kwargs = {"lw": 0.7, "color": "tab:blue"}
     if plot_kwargs is None:
         plot_kwargs = default_plot_kwargs
     else:
-        plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
-
+        # plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+        pass
     # Calculate separation
     separation = (
         np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min()) * 1.2
@@ -133,7 +133,7 @@ def plot_time_series(
 
     # Create figure
     if ax is None:
-        fig, ax = create_figure(**fig_kwargs)
+        fig, ax = plt.figure(**fig_kwargs)
 
     # Plot data
     ax.plot(time_series[:n_samples] + gaps[None, :], **plot_kwargs)
@@ -151,7 +151,7 @@ def plot_time_series(
         ax.set_yticks([])
 
     # Save figure
-    if filename is not None:
-        save(fig, filename)
+    # if filename is not None:
+    #     save(fig, filename)
 
-    return (fig,)
+    return fig, ax

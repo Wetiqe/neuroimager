@@ -4,7 +4,7 @@ from sklearn.cross_decomposition import CCA
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
-from plotting import density_scatter
+from neuroimager.plotting import density_scatter
 
 
 def permutation_test_cca(X, Y, n_components=1, n_permutations=1000, random_state=None):
