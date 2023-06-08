@@ -8,6 +8,7 @@ from neuroimager.utils.fc import (
     flatten_lower_triangular,
     unflatten_lower_triangular,
     filter_fcs,
+    extract_bipartite_matrix,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "flatten_lower_triangular",
     "unflatten_lower_triangular",
     "filter_fcs",
+    "extract_bipartite_matrix",
 ]

@@ -38,14 +38,15 @@ def filter_fcs(
 
 
 def extract_bipartite_matrix(
-    matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
+        matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
 ):
     """Extract the bipartite part of a functional connectivity matrix.
 
     :param matrix: A numpy matrix shaped (n_subjs, n_nodes, n_nodes) representing the functional connectivity data.
     :param network_labels: A list containing the network labels for each node.
-    :param bp1_labels: A list of network labels for Network 1 nodes.
-    :param bp2_labels: A list of network labels for other networks' nodes.
+            should be the same order and length as the number of nodes in the matrix.
+    :param bp1_labels: A list of network names for Network 1 nodes.
+    :param bp2_labels: A list of network names for other networks' nodes.
     :return: A numpy matrix containing the desired bipartite part of the functional connectivity matrix.
     """
     # the network_labels should have same length as nodes in the matrix
@@ -57,7 +58,7 @@ def extract_bipartite_matrix(
     network1_indices = np.isin(network_labels, bp1_labels)
     other_networks_indices = np.isin(network_labels, bp2_labels)
 
-    bipartite_matrix = matrix[np.ix_(network1_indices, other_networks_indices)]
+    bipartite_matrix = matrix[np.ix_(range(matrix.shape[0]), network1_indices, other_networks_indices)]
 
     return bipartite_matrix
 
