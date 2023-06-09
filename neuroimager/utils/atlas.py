@@ -213,6 +213,7 @@ def filter_rois(
         mask = np.isin(atlas_data, all_roi_indices)
         new_atlas_data = np.where(mask, atlas_data, 0)
         new_atlas_img = nib.Nifti1Image(new_atlas_data, atlas_img.affine)
+        nib.save(new_atlas_img, output_path)
 
     return new_atlas_img
 
