@@ -167,7 +167,7 @@ def filter_rois(
 ):
     """
     This function extracts or exclude specified regions of interest (ROIs) from a given atlas image and saves it.
-    This function uses 0 indexing. Works for both 3D and 4D atlases.
+    This function uses 0 indexing (starts from first ROI) for both 3D and 4D atlases.
 
     Parameters:
     atlas (str or nib.nifti1.Nifti1Image): The input atlas image, either as a file path string or a nibabel image object.

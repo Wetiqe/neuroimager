@@ -9,6 +9,7 @@ from neuroimager.utils.fc import (
     unflatten_lower_triangular,
     filter_fcs,
     extract_bipartite_matrix,
+    average_nodes,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "unflatten_lower_triangular",
     "filter_fcs",
     "extract_bipartite_matrix",
+    "average_nodes",
 ]

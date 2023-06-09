@@ -63,6 +63,44 @@ def extract_bipartite_matrix(
     return bipartite_matrix
 
 
+def average_nodes(fc_matrix, labels):
+    """
+    Computes an averaged functional connectivity matrix for each unique label
+    in the input labels array. The function accepts both 2D and 3D fc_matrix arrays.
+
+    Parameters:
+    -----------
+    fc_matrix : numpy array, shape (subject, node, node) or (node, node)
+        Functional connectivity matrix or matrices. If 2D, it is assumed to be a single
+        matrix. If 3D, each matrix along the first axis corresponds to a subject.
+
+    labels : numpy array, shape (subject,)
+        Labels corresponding to each subject in the fc_matrix. Each unique label
+        represents a group for which an averaged functional connectivity matrix
+        will be computed.
+
+    Returns:
+    --------
+    avg_fc_matrices : numpy array, shape (unique_labels, node, node)
+        Averaged functional connectivity matrices for each unique label in the
+        input labels array. If the input fc_matrix is 2D, the output will also
+        be 2D with shape (node, node).
+    """
+    if len(fc_matrix.shape) == 2:
+        fc_matrix = np.expand_dims(fc_matrix, axis=0)
+    unique_labels = np.unique(np.array(labels))
+    n_subjs, n_nodes, _ = fc_matrix.shape
+    averaged_fc_matrix = np.zeros((n_subjs, len(unique_labels), len(unique_labels)))
+
+    for i, label in enumerate(unique_labels):
+        label_indices = np.where(labels == label)[0]
+        for j, other_label in enumerate(unique_labels):
+            other_label_indices = np.where(labels == other_label)[0]
+            averaged_fc_matrix[:, i, j] = fc_matrix[:, label_indices, :][:, :, other_label_indices].mean(axis=(1, 2))
+
+    return averaged_fc_matrix.squeeze()
+
+
 def flatten_lower_triangular(matrix):
     """
     This function takes a 2D or 3D numpy array returns a 2D numpy array.
