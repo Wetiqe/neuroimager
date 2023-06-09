@@ -38,7 +38,7 @@ def filter_fcs(
 
 
 def extract_bipartite_matrix(
-        matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
+    matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
 ):
     """Extract the bipartite part of a functional connectivity matrix.
 
@@ -58,7 +58,9 @@ def extract_bipartite_matrix(
     network1_indices = np.isin(network_labels, bp1_labels)
     other_networks_indices = np.isin(network_labels, bp2_labels)
 
-    bipartite_matrix = matrix[np.ix_(range(matrix.shape[0]), network1_indices, other_networks_indices)]
+    bipartite_matrix = matrix[
+        np.ix_(range(matrix.shape[0]), network1_indices, other_networks_indices)
+    ]
 
     return bipartite_matrix
 
@@ -96,7 +98,9 @@ def average_nodes(fc_matrix, labels):
         label_indices = np.where(labels == label)[0]
         for j, other_label in enumerate(unique_labels):
             other_label_indices = np.where(labels == other_label)[0]
-            averaged_fc_matrix[:, i, j] = fc_matrix[:, label_indices, :][:, :, other_label_indices].mean(axis=(1, 2))
+            averaged_fc_matrix[:, i, j] = fc_matrix[:, label_indices, :][
+                :, :, other_label_indices
+            ].mean(axis=(1, 2))
 
     return averaged_fc_matrix.squeeze()
 

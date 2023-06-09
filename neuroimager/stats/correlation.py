@@ -4,15 +4,15 @@ import pandas as pd
 
 
 def partial_corrs(
-        data,
-        x_labels: list = None,
-        y_labels: list = None,
-        covars: list = None,
-        method="auto",
-        semi=False,
-        alternative="two-sided",
-        correct_p="global",
-        correct_method="holm",
+    data,
+    x_labels: list = None,
+    y_labels: list = None,
+    covars: list = None,
+    method="auto",
+    semi=False,
+    alternative="two-sided",
+    correct_p="global",
+    correct_method="holm",
 ):
     """
     Compute partial correlations between pairs of variables, controlling for specified covariates.
