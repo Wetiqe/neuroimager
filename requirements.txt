@@ -6,3 +6,4 @@ pingouin
 seaborn
 sklearn
 nilearn
+networkx

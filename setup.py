@@ -11,7 +11,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="neuroimager",
-    version="0.0.4",
+    version="0.0.5",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
