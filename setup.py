@@ -6,13 +6,9 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(current_dir, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-# Read the contents of the requirements.txt file
-with open(os.path.join(current_dir, "requirements.txt"), encoding="utf-8") as f:
-    requirements = f.read().splitlines()
-
 setup(
     name="neuroimager",
-    version="0.0.5",
+    version="0.0.6",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
@@ -20,7 +16,17 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Wetiqe/neuroimager",
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=[
+        "matplotlib",
+        "numpy",
+        "pandas==1.5.3",
+        "scipy==1.10.1",
+        "pingouin",
+        "seaborn",
+        "sklearn",
+        "nilearn",
+        "networkx",
+    ],
     classifiers=[
         "Development Status :: 1 - Planning",
         "Programming Language :: Python :: 3",
