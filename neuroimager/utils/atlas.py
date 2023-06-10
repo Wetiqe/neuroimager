@@ -163,7 +163,7 @@ def filter_rois(
     atlas: str or nib.nifti1.Nifti1Image,
     rois: list,
     output_path: str,
-    remove=True,
+    remove: bool = True,
 ):
     """
     This function extracts or exclude specified regions of interest (ROIs) from a given atlas image and saves it.
