@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms import bipartite
 
+
 def create_bipartite_graph(adj_mat, num_nodes_set1, num_nodes_set2, corr_thresh=0.2):
     # Filter adjacency matrix based on the correlation threshold
     adj_mat = np.where(np.abs(adj_mat) >= corr_thresh, adj_mat, 0)
@@ -11,7 +12,9 @@ def create_bipartite_graph(adj_mat, num_nodes_set1, num_nodes_set2, corr_thresh=
 
     # Add nodes to the graph
     bipartite_graph.add_nodes_from(range(1, num_nodes_set1 + 1), bipartite=0)
-    bipartite_graph.add_nodes_from(range(num_nodes_set1 + 1, num_nodes_set1 + num_nodes_set2 + 1), bipartite=1)
+    bipartite_graph.add_nodes_from(
+        range(num_nodes_set1 + 1, num_nodes_set1 + num_nodes_set2 + 1), bipartite=1
+    )
 
     # Add weighted edges between the two sets
     for node_set1 in range(1, num_nodes_set1 + 1):
@@ -45,6 +48,7 @@ def create_full_graph(adj_mat, corr_thresh=0.2):
 
     return full_graph
 
+
 # TODO: Define the metrics that are not directly provided
 # TODO: Check if the small_worldness are correct
 def small_worldness(G):
@@ -61,21 +65,25 @@ def small_worldness(G):
 
 def compute_bipa_graph_metrics(bipartite_graph, nodes_set1):
     metrics = {
-        'clustering': bipartite.clustering(bipartite_graph),
-        'clustering_coefficient': bipartite.cluster.clustering(bipartite_graph),
-        'betweenness_centrality': bipartite.betweenness_centrality(bipartite_graph, nodes_set1),
-        'degree_centrality': bipartite.degree_centrality(bipartite_graph, nodes_set1),
-        'closeness_centrality': bipartite.closeness_centrality(bipartite_graph, nodes_set1)
+        "clustering": bipartite.clustering(bipartite_graph),
+        "clustering_coefficient": bipartite.cluster.clustering(bipartite_graph),
+        "betweenness_centrality": bipartite.betweenness_centrality(
+            bipartite_graph, nodes_set1
+        ),
+        "degree_centrality": bipartite.degree_centrality(bipartite_graph, nodes_set1),
+        "closeness_centrality": bipartite.closeness_centrality(
+            bipartite_graph, nodes_set1
+        ),
     }
     return metrics
 
 
 def compute_full_graph_metrics(full_graph):
     metrics = {
-        'clustering': nx.clustering(full_graph),
-        'clustering_coefficient': nx.average_clustering(full_graph),
-        'betweenness_centrality': nx.betweenness_centrality(full_graph),
-        'degree_centrality': nx.degree_centrality(full_graph),
-        'closeness_centrality': nx.closeness_centrality(full_graph)
+        "clustering": nx.clustering(full_graph),
+        "clustering_coefficient": nx.average_clustering(full_graph),
+        "betweenness_centrality": nx.betweenness_centrality(full_graph),
+        "degree_centrality": nx.degree_centrality(full_graph),
+        "closeness_centrality": nx.closeness_centrality(full_graph),
     }
     return metrics
