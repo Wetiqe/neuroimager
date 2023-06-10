@@ -1,14 +1,13 @@
 from setuptools import setup, find_packages
 import os
 
+current_dir = os.path.abspath(os.path.dirname(__file__))
 # Read the contents of your README file
-with open(os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8") as f:
+with open(os.path.join(current_dir, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 # Read the contents of the requirements.txt file
-with open(
-    os.path.join(os.path.dirname(__file__), "requirements.txt"), encoding="utf-8"
-) as f:
+with open(os.path.join(current_dir, "requirements.txt"), encoding="utf-8") as f:
     requirements = f.read().splitlines()
 
 setup(
