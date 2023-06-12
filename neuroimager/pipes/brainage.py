@@ -3,7 +3,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 
 
-def BAG(train_pred, test_pred, train_y, test_y):
+def BAG(train_pred, test_pred, train_y, test_y, line_reg_order=1):
     """
     Brain Age Gap Correction
 
@@ -23,12 +23,12 @@ def BAG(train_pred, test_pred, train_y, test_y):
     """
 
     line_reg = LinearRegression()
-    poly = PolynomialFeatures(degree=1, include_bias=True)
+    poly = PolynomialFeatures(degree=line_reg_order, include_bias=True)
     line_reg_features = poly.fit_transform(train_y.reshape(-1, 1))
     offset_train = train_pred - train_y
     line_reg.fit(line_reg_features, offset_train.reshape(-1, 1))
     test_features = poly.transform(test_y.reshape(-1, 1))
     offset_test = np.array(line_reg.predict(test_features)).flatten()
-    corrected_age = test_y + offset_test
+    corrected_age = test_pred - offset_test
 
     return corrected_age, offset_train
