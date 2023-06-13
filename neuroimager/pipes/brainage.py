@@ -30,5 +30,5 @@ def BAG(train_pred, test_pred, train_y, test_y, line_reg_order=1):
     test_features = poly.transform(test_y.reshape(-1, 1))
     offset_test = np.array(line_reg.predict(test_features)).flatten()
     corrected_age = test_pred - offset_test
-
-    return corrected_age, offset_train
+    corrected_delta_age = corrected_age - test_y
+    return corrected_age, corrected_delta_age

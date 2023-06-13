@@ -1,4 +1,9 @@
-from neuroimager.plotting.plot import density_scatter, plot_time_series, get_sig, plot_time_series
+from neuroimager.plotting.plot import (
+    density_scatter,
+    plot_time_series,
+    get_sig,
+    plot_time_series,
+)
 
 
 __all__ = [
