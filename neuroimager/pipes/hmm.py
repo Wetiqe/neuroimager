@@ -462,6 +462,7 @@ class HmmParser(object):
                 results["vpath_visit"],
                 results["vpath_lifetime"],
                 results["vpath_interval"],
+                results["vpath_switch"],
             ],
             axis=1,
         )
@@ -815,63 +816,188 @@ class HmmModelSelector(object):
         self.sessions = sessions
         self.prefix = prefix
 
+    """
+    *****************************************************************************
+    Part 1:  Basic Operations
+    *****************************************************************************
+    """
+
+    def __parse_selected_model(self, hmm_file):
+        hmm = HmmParser(
+            hmm_file,
+            self.volumes,
+            self.suj_num,
+            self.sessions,
+            auto_parse=False,
+            generate_report=False,
+        )
+        return hmm
+
     @staticmethod
-    def get_gamma_similarity(gamma1, gamma2):
+    def __check_file(hmm_file):
+        # check if a file exists
+        if not os.path.exists(hmm_file):
+            raise FileNotFoundError(f"{hmm_file} not found")
+        return True
+
+    """
+    *****************************************************************************
+    Part 2:  Similarity Matrix
+    *****************************************************************************
+    """
+
+    @staticmethod
+    def get_gamma_similarity(gamma1: np.array, gamma2: np.array):
         """
+        Mote: This function is recreated from getGammaSimilarity.m of HMM-MAR toolbox.
+        Does not support calculation of averaged gamma2, so it has to be a single trail.
+
         Computes a measure of similarity between two sets of state time courses.
-        These can have different number of states, but they must have the same
-        number of time points.
-        If gamma2 is a list, then it aggregates the similarity measures across
-        elements of gamma2
-        S: similarity, measured as the sum of joint probabilities under the
-        optimal state alignment
-        assig: optimal state aligmnent for gamma2 (uses munkres' algorithm)
-        gamma2: the second set of state time courses reordered to match gamma1
+        These can have different number of states, but they must have to be the same length.
+        similarity: the sum of joint probabilities under the optimal state alignment
+        gamma2_order: optimal state alignment for gamma2 (uses munkres algorithm)
+        gamma2_reordered: the second set of state time courses reordered to match gamma1
 
-        Author: Diego Vidaurre, University of Oxford (2017)
         """
-
-        from munkres import Munkres
-
-        if isinstance(gamma2, list):
-            N = len(gamma2)
-        else:
-            N = 1
+        # check input
+        if gamma1.shape[0] != gamma2.shape[0]:
+            raise ValueError(
+                "gamma1 and gamma2 must have the same number of time points"
+            )
+        if len(gamma1.shape) != 2 or len(gamma2.shape) != 2:
+            raise ValueError("gamma1 and gamma2 must be 2D arrays")
 
         T, K = gamma1.shape
 
         gamma1_0 = gamma1.copy()
-
         M = np.zeros((K, K))  # cost
 
-        for j in range(N):
-            if isinstance(gamma2, list):
-                g = gamma2[j]
-            else:
-                g = gamma2
+        g = gamma2
 
-            K2 = g.shape[1]
+        K2 = g.shape[1]
 
-            if K < K2:
-                gamma1 = np.hstack((gamma1_0, np.zeros((T, K2 - K))))
-                K = K2
-            elif K > K2:
-                g = np.hstack((g, np.zeros((T, K - K2))))
+        if K < K2:
+            gamma1 = np.hstack((gamma1_0, np.zeros((T, K2 - K))))
+            K = K2
+        elif K > K2:
+            g = np.hstack((g, np.zeros((T, K - K2))))
 
-            for k1 in range(K):
-                for k2 in range(K):
-                    M[k1, k2] = (
-                        M[k1, k2]
-                        + (T - np.sum(np.minimum(gamma1[:, k1], g[:, k2]))) / T / N
-                    )
+        for k1 in range(K):
+            for k2 in range(K):
+                M[k1, k2] = (
+                    M[k1, k2] + (T - np.sum(np.minimum(gamma1[:, k1], g[:, k2]))) / T
+                )
+        from munkres import Munkres
 
         munkres_solver = Munkres()
-        assig = munkres_solver.compute(M.copy())
-        cost = sum(M[i][j] for i, j in assig)
+        gamma2_order = munkres_solver.compute(M.copy())
+        cost = sum(M[i][j] for i, j in gamma2_order)
 
-        S = K - cost
+        similarity = K - cost
 
-        if nargout > 2:
-            gamma2 = gamma2[:, assig]
+        gamma2_reordered = gamma2[:, gamma2_order]
 
-        return S, assig, gamma2
+        return similarity, gamma2_order, gamma2_reordered
+
+    def calc_simi_matrix(self, state_k):
+        gamma = {}
+        for rep in range(1, self.rep_num + 1):
+            try:
+                if self.prefix is None:
+                    hmm_file = f"{self.models_dir}k{state_k}_rep{rep}.mat"
+                else:
+                    hmm_file = f"{self.models_dir}{self.prefix}_k{state_k}_rep{rep}.mat"
+                self.__check_file(hmm_file)
+                hmm = self.__parse_selected_model(hmm_file)
+                gamma[rep] = hmm.gamma
+            except FileNotFoundError:
+                print(f"Rep{rep} for {state_k} not found, skipping")
+                continue
+        size = len(gamma.keys())
+        simi_matrix = np.zeros((size, size))
+        for i in range(size):
+            for j in range(i, size):
+                if i == j:
+                    simi_matrix[i, j] = 1
+                simi_matrix[i, j], _, _ = self.get_gamma_similarity(
+                    gamma[i + 1], gamma[j + 1]
+                )
+                simi_matrix[j, i] = simi_matrix[i, j]
+
+        return simi_matrix
+
+    def plot_simi_matrix(self, state_k, simi_matrix):
+        plt.figure(figsize=(10, 10))
+        plt.imshow(simi_matrix)
+        plt.colorbar()
+        plt.title(f"Similarity Matrix for {state_k} states")
+        plt.savefig(f"{self.models_dir}simi_matrix_{state_k}.png")
+        plt.close()
+
+    """
+    *****************************************************************************
+    Part 3:  MaxFO and Switch rate
+    *****************************************************************************
+    """
+
+    def __get_subj_chronnectome(self, state_k):
+        """
+        Get the chronnectome of the model
+        """
+        vpath_max_fo, gamma_max_fo, switch = {}, {}, {}
+        for rep in range(1, self.rep_num + 1):
+            try:
+                if self.prefix is None:
+                    hmm_file = f"{self.models_dir}k{state_k}_rep{rep}.mat"
+                else:
+                    hmm_file = f"{self.models_dir}{self.prefix}_k{state_k}_rep{rep}.mat"
+                self.__check_file(hmm_file)
+                hmm = self.__parse_selected_model(hmm_file)
+                chronnectome = hmm.parse_chronnectome()
+                vpath_max_fo[rep] = chronnectome["vpath_max_fo"].values
+                gamma_max_fo[rep] = chronnectome["gamma_max_fo"].values
+                switch[rep] = chronnectome["switch"].values
+            except FileNotFoundError:
+                print(f"Rep{rep} for {state_k} not found, skipping")
+                continue
+
+        return vpath_max_fo, gamma_max_fo, switch
+
+    def __get_avg_chronnectome(self, state_k):
+        pass
+
+    def concat_chronnectome(self):
+        # all the subj level max fo and switch rate.
+        # each row is a subj, and columns are second level -- state_k and rep_i
+        # For all of the three parameters, store them in separate df and return as a dict
+        pass
+
+    """
+    *****************************************************************************
+    Part 4:  Visualization
+    *****************************************************************************
+    """
+
+    def plot_similarity(self):
+        pass
+
+    def plot_chronnectome(self):
+        pass
+
+    """
+    *****************************************************************************
+    Part 5:  Automation
+    *****************************************************************************
+    """
+
+    def auto_parse(self):
+        for state_k in self.state_k:
+            simi_matrix = self.calc_simi_matrix(state_k)
+            self.plot_simi_matrix(state_k, simi_matrix)
+            vpath_max_fo, gamma_max_fo, switch = self.__get_subj_chronnectome(state_k)
+            self.concat_chronnectome()
+            # self.plot_chronnectome()
+        return
+
+    def generate_report(self):
+        pass
