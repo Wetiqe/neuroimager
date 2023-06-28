@@ -794,3 +794,84 @@ class HmmParser(object):
                 </html>
                 """
             )
+
+
+class HmmModelSelector(object):
+    def __init__(
+        self,
+        models_dir,
+        krange,
+        rep_num,
+        volumes: int,
+        subj_num: int,
+        sessions: int = 1,
+        prefix: str = None,
+    ):
+        self.models_dir = models_dir
+        self.krange = krange
+        self.rep_num = rep_num
+        self.volumes = volumes
+        self.suj_num = subj_num
+        self.sessions = sessions
+        self.prefix = prefix
+
+    @staticmethod
+    def get_gamma_similarity(gamma1, gamma2):
+        """
+        Computes a measure of similarity between two sets of state time courses.
+        These can have different number of states, but they must have the same
+        number of time points.
+        If gamma2 is a list, then it aggregates the similarity measures across
+        elements of gamma2
+        S: similarity, measured as the sum of joint probabilities under the
+        optimal state alignment
+        assig: optimal state aligmnent for gamma2 (uses munkres' algorithm)
+        gamma2: the second set of state time courses reordered to match gamma1
+
+        Author: Diego Vidaurre, University of Oxford (2017)
+        """
+
+        from munkres import Munkres
+
+        if isinstance(gamma2, list):
+            N = len(gamma2)
+        else:
+            N = 1
+
+        T, K = gamma1.shape
+
+        gamma1_0 = gamma1.copy()
+
+        M = np.zeros((K, K))  # cost
+
+        for j in range(N):
+            if isinstance(gamma2, list):
+                g = gamma2[j]
+            else:
+                g = gamma2
+
+            K2 = g.shape[1]
+
+            if K < K2:
+                gamma1 = np.hstack((gamma1_0, np.zeros((T, K2 - K))))
+                K = K2
+            elif K > K2:
+                g = np.hstack((g, np.zeros((T, K - K2))))
+
+            for k1 in range(K):
+                for k2 in range(K):
+                    M[k1, k2] = (
+                        M[k1, k2]
+                        + (T - np.sum(np.minimum(gamma1[:, k1], g[:, k2]))) / T / N
+                    )
+
+        munkres_solver = Munkres()
+        assig = munkres_solver.compute(M.copy())
+        cost = sum(M[i][j] for i, j in assig)
+
+        S = K - cost
+
+        if nargout > 2:
+            gamma2 = gamma2[:, assig]
+
+        return S, assig, gamma2
