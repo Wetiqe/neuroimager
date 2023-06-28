@@ -1,3 +1,6 @@
+# Date: 2023-06
+# Author: Jianzhang Ni (weitqe@GitHub), UoB & CUHK
+
 import os
 
 import numpy as np
@@ -12,19 +15,19 @@ from nilearn import plotting
 
 class HmmParser(object):
     def __init__(
-            self,
-            hmm: str or dict,
-            volumes: int,
-            subj_num: int,
-            sessions=1,
-            vpath=None,
-            gamma=None,
-            xi=None,
-            subj_labels=None,
-            roi_labels=None,
-            auto_parse=True,
-            generate_report=True,
-            output_dir=None,
+        self,
+        hmm: str or dict,
+        volumes: int,
+        subj_num: int,
+        sessions=1,
+        vpath=None,
+        gamma=None,
+        xi=None,
+        subj_labels=None,
+        roi_labels=None,
+        auto_parse=True,
+        generate_report=True,
+        output_dir=None,
     ):
         if isinstance(hmm, str):
             # most simple way to use this class
@@ -49,6 +52,8 @@ class HmmParser(object):
             self.subj_labels = self._generate_subj_labels_with_session()
         if output_dir is None:
             self.output_dir = os.getcwd()
+        else:
+            self.output_dir = output_dir
         self._check_hmm()
         self.K = int(self.hmm["K"])
         self.states_info = {}
@@ -58,8 +63,9 @@ class HmmParser(object):
                 self.states_info[f"state{i}"] = {"mean": mean, "conn": conn}
             self.P = self.transition_matrix()
         if generate_report:
-            self._mean_fig = self.plot_means()
-            self._conn_fig = self.plot_conns()
+            self.generate_report()
+            # self._mean_fig = self.plot_means()
+            # self._conn_fig = self.plot_conns()
 
     """
     *****************************************************************************
@@ -267,10 +273,11 @@ class HmmParser(object):
                             "Omega": omega_dict,
                         }
                         continue
-                    tem_dict[f"state{k + 1}"] = {
-                        "prior": pr_dict,
-                        "W": w_dict,
-                    }
+                    elif unique:
+                        tem_dict[f"state{k + 1}"] = {
+                            "prior": pr_dict,
+                            "W": w_dict,
+                        }
                 hmm_dict[param] = tem_dict
             else:
                 hmm_dict[param] = np.squeeze(data)
@@ -288,7 +295,7 @@ class HmmParser(object):
     def vpath_fo(vpath):
         state_fo = dict()
         length = len(vpath)
-        k_states = np.unique(vpath)
+        k_states = len(np.unique(vpath))
         for state in range(1, k_states + 1):
             fo = [np.count_nonzero(vpath == state) / length]
             state_fo[f"state{state}_fo"] = fo
@@ -313,7 +320,7 @@ class HmmParser(object):
     def vpath_visit(vpath):
         dic = dict()
         length = len(vpath)
-        k_states = np.unique(vpath)
+        k_states = len(np.unique(vpath))
         for state in range(1, k_states + 1):
             vpath_bool = vpath == state
             visit = 0
@@ -351,7 +358,7 @@ class HmmParser(object):
     def vpath_lifetime(vpath, mean=True):
         dic = dict()
         length = len(vpath)
-        k_states = np.unique(vpath)
+        k_states = len(np.unique(vpath))
         for state in range(1, k_states + 1):
             lifes = []
             vpath_bool = vpath == state
@@ -364,7 +371,9 @@ class HmmParser(object):
                     life = 0
                 else:
                     pass
-            if mean:
+            if len(lifes) == 0:
+                dic[f"state{state}_interval"] = [0]
+            elif mean:
                 dic[f"state{state}_lifetime"] = [np.mean(lifes)]
             else:
                 dic[f"state{state}_lifetime"] = [lifes]
@@ -375,7 +384,7 @@ class HmmParser(object):
     def vpath_interval(vpath, mean=True):
         dic = dict()
         length = len(vpath)
-        k_states = np.unique(vpath)
+        k_states = len(np.unique(vpath))
         for state in range(1, k_states + 1):
             intervals = []
             vpath_bool = vpath == state
@@ -388,7 +397,9 @@ class HmmParser(object):
                     interval = 0
                 else:
                     pass
-            if mean:
+            if len(intervals) == 0:
+                dic[f"state{state}_interval"] = [0]
+            elif mean:
                 dic[f"state{state}_interval"] = [np.mean(intervals)]
             else:
                 dic[f"state{state}_interval"] = [intervals]
@@ -427,8 +438,8 @@ class HmmParser(object):
         for func in funcs:
             dfs = []
             for i in range(self.subj_num):
-                subj_vpath = self.vpath[self.volumes * i: self.volumes * (i + 1)]
-                subj_gamma = self.gamma[self.volumes * i: self.volumes * (i + 1), :]
+                subj_vpath = self.vpath[self.volumes * i : self.volumes * (i + 1)]
+                subj_gamma = self.gamma[self.volumes * i : self.volumes * (i + 1), :]
                 if func.__name__ in ["vpath_lifetime", "vpath_interval"]:
                     subj_df = func(vpath=subj_vpath, mean=mean)
                 elif func.__name__ in ["gamma_fo"]:
@@ -436,7 +447,7 @@ class HmmParser(object):
                 else:
                     subj_df = func(vpath=subj_vpath)
                 try:
-                    subj_df.index = self.roi_labels[i]
+                    subj_df.index = [self.subj_labels[i]]
                 except ValueError:
                     raise ValueError(
                         "The number of subject labels does not match the number of subjects"
@@ -472,9 +483,62 @@ class HmmParser(object):
 
     def _conn(self, k):
         # calculate cov and corr matrix
-        state = self.hmm["state"][f"state{k}"]["Omega"]
-        ndim = state["Gam_shape"].shape[0]
-        cov_mat = state["Gam_rate"] / (state["Gam_shape"] - ndim - 1)
+        """
+        This function only implements the third part of the following matlab function:
+        References:
+        if do_HMM_pca
+            if ~original_space
+                warning('Connectivity maps will necessarily be in original space')
+            end
+            ndim = size(hmm.state(k).W.Mu_W,1);
+            covmat = hmm.state(k).W.Mu_W * hmm.state(k).W.Mu_W' + ...
+                hmm.Omega.Gam_rate / hmm.Omega.Gam_shape * eye(ndim);
+            icovmat = - inv(covmat);
+            icovmat = (icovmat ./ repmat(sqrt(abs(diag(icovmat))),1,ndim)) ...
+                ./ repmat(sqrt(abs(diag(icovmat)))',ndim,1);
+            icovmat(eye(ndim)>0) = 0;
+        elseif is_diagonal
+            covmat = diag( hmm.state(k).Omega.Gam_rate / (hmm.state(k).Omega.Gam_shape-1) );
+            if ~isfield(hmm.state(k).Omega,'Gam_irate')
+                hmm.state(k).Omega.Gam_irate = 1 ./ hmm.state(k).Omega.Gam_irate;
+            end
+            icovmat = diag( hmm.state(k).Omega.Gam_irate * (hmm.state(k).Omega.Gam_shape-1) );
+        else
+            ndim = length(hmm.state(k).Omega.Gam_rate);
+            covmat = hmm.state(k).Omega.Gam_rate / (hmm.state(k).Omega.Gam_shape-ndim-1);
+            if ~isfield(hmm.state(k).Omega,'Gam_irate')
+                hmm.state(k).Omega.Gam_irate = inv(hmm.state(k).Omega.Gam_rate);
+            end
+            icovmat = hmm.state(k).Omega.Gam_irate * (hmm.state(k).Omega.Gam_shape-ndim-1);
+            icovmat = (icovmat ./ repmat(sqrt(abs(diag(icovmat))),1,ndim)) ...
+                ./ repmat(sqrt(abs(diag(icovmat)))',ndim,1);
+            icovmat(eye(ndim)>0) = 0;
+        end
+        """
+        if self.hmm["train"]["covtype"] in [
+            "sharedfull",
+            "uniquefull",
+            "shareddiag",
+            "uniquediag",
+        ]:
+            state = self.hmm["Omega"]
+        else:
+            state = self.hmm["state"][f"state{k}"]["Omega"]
+
+        if self.hmm["train"]["covtype"] in ["diag", "shareddiag", "uniquediag"]:
+            cov_mat = np.diag(state["Gam_rate"] / (state["Gam_shape"] - 1))
+            if "Gam_irate" not in state.keys():
+                state["Gam_irate"] = 1 / state["Gam_rate"]
+            icov_mat = np.diag(state["Gam_irate"] * (state["Gam_shape"] - 1))
+        else:
+            ndim = state["Gam_rate"].shape[0]
+            cov_mat = state["Gam_rate"] / (state["Gam_shape"] - ndim - 1)
+            if "Gam_irate" not in state.keys():
+                state["Gam_irate"] = np.linalg.inv(state["Gam_rate"])
+            icov_mat = state["Gam_irate"] * (state["Gam_shape"] - ndim - 1)
+            icov_mat = icov_mat / np.sqrt(np.abs(np.diag(icov_mat)))
+            icov_mat = icov_mat / np.sqrt(np.abs(np.diag(icov_mat))).T
+            np.fill_diagonal(icov_mat, 0)
 
         def correlation_from_covariance(covariance):
             v = np.sqrt(np.diag(covariance))
@@ -485,13 +549,13 @@ class HmmParser(object):
 
         corr_mat = correlation_from_covariance(cov_mat)
 
-        return cov_mat, corr_mat
+        return cov_mat, icov_mat, corr_mat
 
     def get_conns(self):
         # loop through k
         conns = []
         for k in range(1, self.K + 1):
-            _, corr_mat = self._conn(k)
+            _, _, corr_mat = self._conn(k)
             conns.append(corr_mat)
 
         return conns
@@ -506,6 +570,10 @@ class HmmParser(object):
         """
         Calculate the transition matrix of the HMM model
 
+        Notes
+        This function doesn't consider multiple sessions as the PNAS paper does.
+        Since it is just a method to reorder the transition matrix.
+        Feel free to use any other clustering method.
         Returns
         -------
         transition_matrix : pd.DataFrame
@@ -521,9 +589,11 @@ class HmmParser(object):
         transition_matrix = pd.DataFrame(
             transition_matrix, index=state_labels, columns=state_labels
         )
-        gamma_sub_mean = np.mean(self.gamma, axis=0).squeeze()
+
+        # gamma_sub_mean = np.mean(self.gamma, axis=1).squeeze()
+
         pca = PCA(n_components=1)
-        pca1 = pca.fit_transform(gamma_sub_mean.T)
+        pca1 = pca.fit_transform(self.gamma.T)
         order = np.argsort(pca1, axis=0).ravel()
         transition_matrix = transition_matrix.iloc[order, order]
 
@@ -534,7 +604,7 @@ class HmmParser(object):
 
         if self.P is None:
             self.P = self.transition_matrix()
-        graph_data = self.P
+        graph_data = self.P.values
         graph_data[graph_data < threshold] = 0
         graph_data[graph_data >= threshold] = 1
         graph = nx.DiGraph()  # or DiGraph, MultiGraph, MultiDiGraph, etc
@@ -542,7 +612,9 @@ class HmmParser(object):
             for other_node in self.P.index:
                 if node == other_node:
                     continue
-                graph.add_weighted_edges_from([(node, other_node, self.P.loc[node, other_node])])
+                graph.add_weighted_edges_from(
+                    [(node, other_node, self.P.loc[node, other_node])]
+                )
 
         return graph
 
@@ -554,8 +626,8 @@ class HmmParser(object):
 
     def plot_means(self, roi_labels=None):
         means = self.get_means()
-        fig, axes = plt.subplots(self.K, figsize=(20, self.K * 3))
-        plt.title("Mean activation of each state")
+        fig, axes = plt.subplots(self.K, figsize=(len(means) * 2, self.K * 1.1))
+        fig.suptitle("Mean activation of each state")
         if roi_labels is None:
             roi_labels = self.roi_labels
         for i in range(self.K):
@@ -564,34 +636,37 @@ class HmmParser(object):
             bar = np.max(np.abs(means[i])) * 0.9
             sns.heatmap(
                 pd.DataFrame(mean, columns=[f"state{i + 1}"]).T,
-                index=roi_labels,
                 cmap="RdBu_r",
                 vmin=-bar,
                 vmax=bar,
                 ax=ax,
                 cbar=True,
             )
+        plt.subplots_adjust(hspace=0.5, wspace=0.5)
 
         return fig
 
     def plot_conns(self):
         conns = self.get_conns()
-        fig, axes = plt.subplots(int(self.K / 2), 2, figsize=(20, self.K * 5))
-        plt.title("Connectivity of each state")
+        dim = conns[0].shape[0]
+        fig, axes = plt.subplots(int(self.K / 2), 2, figsize=(12, 6 * int(self.K / 2)))
+        axes = axes.ravel()
+        fig.suptitle("Connectivity of each state")
         for i in range(self.K):
             ax = axes[i]
             conn = conns[i]
             plotting.plot_matrix(
                 conn,
-                figure=fig,
                 axes=ax,
                 colorbar=True,
-                vmax=1,
-                vmin=-1,
+                # vmax=1,
+                # vmin=-1,
                 reorder=False,
-                labels=self.roi_labels,
             )
             ax.set_title(f"State {i + 1}")
+        plt.subplots_adjust(
+            hspace=0.5, wspace=0.5, top=0.9, bottom=0.1, left=0.1, right=0.9
+        )
 
         return fig
 
@@ -606,8 +681,8 @@ class HmmParser(object):
         figs = []
         for sub in subj_index:
             vpath = self.vpath[
-                    self.volumes * sub: self.volumes * (sub + 1)
-                    ]  # trial type
+                self.volumes * sub : self.volumes * (sub + 1)
+            ]  # trial type
             durations = np.ones_like(vpath)
             onset = range(vpath.shape[0])
             model_event = pd.DataFrame(
@@ -616,35 +691,35 @@ class HmmParser(object):
             figs.append(
                 plotting.plot_event(
                     model_event,
-                    cmap=None,
-                    output_file=None,
-                    title=f"Subject {self.subj_labels[sub]}",
                 )
             )
-
+        if len(figs) == 1:
+            return figs[0]
         return figs
 
     def plot_louvain_community(self, threshold=0.2):
         import networkx as nx
         from sknetwork.clustering import Louvain
-        from networkx.drawing.nx_agraph import graphviz_layout
+        from sknetwork.visualization import svg_graph
 
         graph = self.get_graph(threshold=threshold)
         sparse_graph = nx.to_scipy_sparse_array(graph)
+        # not sure why the sparse array is not working with Louvain, have to use numpy array now.
+        numpy_array = sparse_graph.toarray()
         louvain = Louvain()
-        labels = louvain.fit_transform(sparse_graph)
+        labels = louvain.fit_transform(numpy_array)
+        labels_array = np.array(labels.todense())
+        labels_list = list(np.argmax(labels_array, axis=1))
         names = self.P.columns
-        pos = graphviz_layout(graph, prog="neato")
+        pos = nx.spring_layout(graph)
         fig, ax = plt.subplots(figsize=(self.K, self.K))
 
         # Set colors for nodes using the labels
-        cmap = sns.color_palette("husl", len(set(labels)))
-        node_colors = [cmap[label] for label in labels]
+        cmap = sns.color_palette("husl", len(labels_list))
+        node_colors = [cmap[label] for label in labels_list]
 
         nx.draw(graph, pos, node_color=node_colors, with_labels=True, ax=ax)
         ax.set_title("Louvain Community Clustering")
-
-        # Save the figure as an SVG file
         return fig
 
     """
@@ -653,27 +728,37 @@ class HmmParser(object):
     *****************************************************************************
     """
 
-    def generate_report(self, threshold=0.2):
+    def generate_report(self, threshold=0.2, plot_vpath=True):
         # plot the figures and save them, then write a html file which cites them
         # plot the figures
         out = self.output_dir + f"hmm_{self.K}states_derivatives/"
-        states_out = f"{out}/states"
-        vpath_out = f"{out}/vpath"
-        graph_out = f"{out}/graph"
+        if not os.path.exists(out):
+            os.makedirs(out)
+        states_out = f"{out}states/"
+        vpath_out = f"{out}vpath/"
+        graph_out = f"{out}graph/"
         if not os.path.exists(states_out):
             os.makedirs(states_out)
         if not os.path.exists(vpath_out):
             os.makedirs(vpath_out)
+        if not os.path.exists(graph_out):
+            os.makedirs(graph_out)
         means = self.plot_means()
-        conns = self.plot_conns()
-        vpath = self.plot_vpath()
-        graph = self.plot_louvain_community(threshold=threshold)
         means.savefig(f"{states_out}means.png")
+        plt.close(means)
+        conns = self.plot_conns()
         conns.savefig(f"{states_out}conns.png")
-        for i, subj_vpath in enumerate(vpath):
-            subj_vpath.savefig(f"{vpath_out}vpath_{self.subj_labels[i]}.png")
+        plt.close(conns)
+        graph = self.plot_louvain_community(threshold=threshold)
         graph.savefig(f"{graph_out}Louvain.png")
-        with open(f"{out}/report.html", "w") as f:
+        plt.close(graph)
+        if plot_vpath:
+            for i, subj_label in enumerate(self.subj_labels):
+                subj_vpath = self.plot_vpath(i)
+                subj_vpath.savefig(f"{vpath_out}vpath_{subj_label}.png")
+                plt.close(subj_vpath)
+
+        with open(f"{out}report.html", "w") as f:
             f.write(
                 f"""
                 <html>
@@ -682,26 +767,30 @@ class HmmParser(object):
                 <img src="{states_out}means.png" alt="means">
                 <h1>Connectivity of each state</h1>
                 <img src="{states_out}conns.png" alt="conns">
-                <h1>State visitation path</h1>
-                """
-            )
-            # loop through subjects and add the images
-            for i, subj_label in enumerate(self.subj_labels):
-                f.write(
-                    f"""
-                    <h2>Subject {subj_label}</h2>
-                    <img src="{vpath_out}/vpath_{subj_label}.png" alt="vpath_{subj_label}">
-                    """
-                )
-            f.write(
-                """
-                </body>
-                </html>
                 """
             )
             f.write(
                 f"""
                 <h1>graph features</h1>
                 <img src="{graph_out}Louvain.png" alt="Louvain">
+                <h1>State visitation path</h1>
+
+                """
+            )
+            # loop through subjects and add the images
+            try:
+                for i, subj_label in enumerate(self.subj_labels):
+                    f.write(
+                        f"""
+                        <h2>Subject {subj_label}</h2>
+                        <img src="{vpath_out}vpath_{subj_label}.png" alt="vpath_{subj_label}">
+                        """
+                    )
+            except FileNotFoundError:
+                pass
+            f.write(
+                """
+                </body>
+                </html>
                 """
             )
