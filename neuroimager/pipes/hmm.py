@@ -19,7 +19,7 @@ class HmmParser(object):
         hmm: str or dict,
         volumes: int,
         subj_num: int,
-        sessions=1,
+        sessions: int=1,
         vpath=None,
         gamma=None,
         xi=None,
@@ -801,8 +801,8 @@ class HmmModelSelector(object):
     def __init__(
         self,
         models_dir,
-        krange,
-        rep_num,
+        krange: list,
+        rep_num: int,
         volumes: int,
         subj_num: int,
         sessions: int = 1,
@@ -991,7 +991,7 @@ class HmmModelSelector(object):
     """
 
     def auto_parse(self):
-        for state_k in self.state_k:
+        for state_k in self.krange:
             simi_matrix = self.calc_simi_matrix(state_k)
             self.plot_simi_matrix(state_k, simi_matrix)
             vpath_max_fo, gamma_max_fo, switch = self.__get_subj_chronnectome(state_k)
