@@ -10,3 +10,5 @@ networkx~=3.1
 setuptools~=67.8.0
 scikit-learn~=1.2.2
 nibabel~=5.1.0
+munkres~=1.1.4
+```

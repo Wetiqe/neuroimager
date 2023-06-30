@@ -19,7 +19,7 @@ class HmmParser(object):
         hmm: str or dict,
         volumes: int,
         subj_num: int,
-        sessions: int=1,
+        sessions: int = 1,
         vpath=None,
         gamma=None,
         xi=None,
@@ -64,8 +64,6 @@ class HmmParser(object):
             self.P = self.transition_matrix()
         if generate_report:
             self.generate_report()
-            # self._mean_fig = self.plot_means()
-            # self._conn_fig = self.plot_conns()
 
     """
     *****************************************************************************
@@ -296,15 +294,19 @@ class HmmParser(object):
         state_fo = dict()
         length = len(vpath)
         k_states = len(np.unique(vpath))
+        max_fo = 0
+        max_state = 0
         for state in range(1, k_states + 1):
             fo = [np.count_nonzero(vpath == state) / length]
             state_fo[f"state{state}_fo"] = fo
             if state == 1:
-                state_fo[f"vpath_max_fo"] = fo
+                max_fo = fo
+                max_state = state
             else:
-                if fo > state_fo[f"vpath_max_fo"]:
-                    state_fo[f"vpath_max_fo"] = fo
-
+                if fo > max_fo:
+                    max_fo = fo
+                    max_state = state
+        state_fo["vpath_max_fo"] = max_fo
         return pd.DataFrame.from_dict(state_fo)
 
     @staticmethod
@@ -466,7 +468,7 @@ class HmmParser(object):
             ],
             axis=1,
         )
-        return results
+        return chronnectome_df
 
     """
     *****************************************************************************
@@ -627,7 +629,7 @@ class HmmParser(object):
 
     def plot_means(self, roi_labels=None):
         means = self.get_means()
-        fig, axes = plt.subplots(self.K, figsize=(len(means) * 2, self.K * 1.1))
+        fig, axes = plt.subplots(self.K, figsize=(len(means) * 2.5, self.K * 1.2))
         fig.suptitle("Mean activation of each state")
         if roi_labels is None:
             roi_labels = self.roi_labels
@@ -636,21 +638,25 @@ class HmmParser(object):
             mean = means[i]
             bar = np.max(np.abs(means[i])) * 0.9
             sns.heatmap(
-                pd.DataFrame(mean, columns=[f"state{i + 1}"]).T,
+                pd.DataFrame(mean, columns=[f"state{i + 1}"], index=roi_labels).T,
                 cmap="RdBu_r",
                 vmin=-bar,
                 vmax=bar,
                 ax=ax,
                 cbar=True,
             )
-        plt.subplots_adjust(hspace=0.5, wspace=0.5)
+        plt.subplots_adjust(hspace=1, wspace=0.5)
 
         return fig
 
     def plot_conns(self):
         conns = self.get_conns()
         dim = conns[0].shape[0]
-        fig, axes = plt.subplots(int(self.K / 2), 2, figsize=(12, 6 * int(self.K / 2)))
+        if self.K % 2 == 1:
+            row = int((self.K // 2) + 1)
+        elif self.K % 2 == 0:
+            row = int(self.K // 2)
+        fig, axes = plt.subplots(row, 2, figsize=(12, 6 * int(self.K / 2)))
         axes = axes.ravel()
         fig.suptitle("Connectivity of each state")
         for i in range(self.K):
@@ -800,13 +806,15 @@ class HmmParser(object):
 class HmmModelSelector(object):
     def __init__(
         self,
-        models_dir,
-        krange: list,
+        models_dir: str,
+        krange: list or range,
         rep_num: int,
         volumes: int,
         subj_num: int,
         sessions: int = 1,
+        subj_labels: list = None,
         prefix: str = None,
+        output_dir: str = None,
     ):
         self.models_dir = models_dir
         self.krange = krange
@@ -815,6 +823,14 @@ class HmmModelSelector(object):
         self.suj_num = subj_num
         self.sessions = sessions
         self.prefix = prefix
+        if subj_labels:
+            self.subj_labels = subj_labels
+        else:
+            self.subj_labels = [f"subj{i}" for i in range(subj_num)]
+        if output_dir is None:
+            self.output_dir = os.getcwd() + "/"
+        else:
+            self.output_dir = output_dir
 
     """
     *****************************************************************************
@@ -900,6 +916,8 @@ class HmmModelSelector(object):
         return similarity, gamma2_order, gamma2_reordered
 
     def calc_simi_matrix(self, state_k):
+        import warnings
+
         gamma = {}
         for rep in range(1, self.rep_num + 1):
             try:
@@ -911,7 +929,9 @@ class HmmModelSelector(object):
                 hmm = self.__parse_selected_model(hmm_file)
                 gamma[rep] = hmm.gamma
             except FileNotFoundError:
-                print(f"Rep{rep} for {state_k} not found, skipping")
+                warnings.warn(
+                    f"Rep{rep} for k{state_k} not found, skipping", UserWarning
+                )
                 continue
         size = len(gamma.keys())
         simi_matrix = np.zeros((size, size))
@@ -926,13 +946,23 @@ class HmmModelSelector(object):
 
         return simi_matrix
 
-    def plot_simi_matrix(self, state_k, simi_matrix):
-        plt.figure(figsize=(10, 10))
-        plt.imshow(simi_matrix)
-        plt.colorbar()
-        plt.title(f"Similarity Matrix for {state_k} states")
-        plt.savefig(f"{self.models_dir}simi_matrix_{state_k}.png")
-        plt.close()
+    @staticmethod
+    def __mean_simi(simi_matrix, reps=5):
+        return (simi_matrix.sum() - reps) / (reps * (reps - 1))
+
+    def get_mean_simi_df(self):
+        mean_simi_df = pd.DataFrame(
+            [], index=self.krange, columns=["State", "Mean_simi"]
+        )
+        for K in self.krange:
+            if K == 1:
+                mean_simi_df.loc[K, "Mean_simi"] = 1
+                mean_simi_df.loc[K, "State"] = f"1 States"
+            else:
+                simi = self.calc_simi_matrix(K)
+                mean_simi_df.loc[K, "Mean_simi"] = self.__mean_simi(simi, simi.shape[0])
+                mean_simi_df.loc[K, "State"] = f"{K} States"
+        return mean_simi_df
 
     """
     *****************************************************************************
@@ -956,21 +986,16 @@ class HmmModelSelector(object):
                 chronnectome = hmm.parse_chronnectome()
                 vpath_max_fo[rep] = chronnectome["vpath_max_fo"].values
                 gamma_max_fo[rep] = chronnectome["gamma_max_fo"].values
-                switch[rep] = chronnectome["switch"].values
+                switch[rep] = chronnectome["switch_rate"].values
             except FileNotFoundError:
                 print(f"Rep{rep} for {state_k} not found, skipping")
                 continue
+        # convert a dict to dataframe
+        vpath_max_fo_df = pd.DataFrame.from_dict(vpath_max_fo)
+        gamma_max_fo_df = pd.DataFrame.from_dict(gamma_max_fo)
+        switch_df = pd.DataFrame.from_dict(switch)
 
-        return vpath_max_fo, gamma_max_fo, switch
-
-    def __get_avg_chronnectome(self, state_k):
-        pass
-
-    def concat_chronnectome(self):
-        # all the subj level max fo and switch rate.
-        # each row is a subj, and columns are second level -- state_k and rep_i
-        # For all of the three parameters, store them in separate df and return as a dict
-        pass
+        return vpath_max_fo_df, gamma_max_fo_df, switch_df
 
     """
     *****************************************************************************
@@ -978,11 +1003,58 @@ class HmmModelSelector(object):
     *****************************************************************************
     """
 
-    def plot_similarity(self):
-        pass
+    @staticmethod
+    def plot_simi_matrix(simi_matrix, **kwargs):
+        fig = plt.figure(figsize=(5, 5))
+        sns.heatmap(simi_matrix, cmap="jet", vmax=1, vmin=-1, **kwargs)
+        plt.title(f"Similarity Matrix")
+        return fig
 
-    def plot_chronnectome(self):
-        pass
+    def __plot_chronnectome(self, data, feature_name, ax=None):
+        """
+        Plot the chronnectome of the model
+        Parameters
+        ----------
+        data: pd.DataFrame with shape (n_subjects, N_reps)
+        """
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=(self.rep_num * 2, 5))
+        violin_cmap = sns.color_palette("cool", n_colors=self.rep_num, desat=0.8)
+        import warnings
+
+        warnings.filterwarnings("ignore", category=UserWarning)
+        sns.violinplot(data=data, inner=None, palette=violin_cmap, ax=ax)
+        sns.stripplot(data=data, jitter=True, size=3, ax=ax)
+        ax.set_ylim(0, 1)
+        ax.set_xlabel("Repetition")
+        ax.set_ylabel(f"{feature_name}")
+
+        return ax
+
+    def plot_chronnectome(self, state_k):
+        from neuroimager.plotting.styler import no_edge
+
+        vpath_max_fo, gamma_max_fo, switch_df = self.__get_subj_chronnectome(state_k)
+        fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+        self.__plot_chronnectome(vpath_max_fo, "vpath_max_fo", no_edge(axes[0]))
+        self.__plot_chronnectome(gamma_max_fo, "gamma_max_fo", no_edge(axes[1]))
+        self.__plot_chronnectome(switch_df, "switch", no_edge(axes[2]))
+        fig.suptitle(f"Chronnectome for {state_k} states")
+
+        return fig
+
+    def plot_mean_simi(self):
+        mean_simi_df = self.get_mean_simi_df()
+        fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+        from neuroimager.plotting import no_edge
+
+        ax = no_edge(ax)
+        fig.suptitle("Mean state similarity")
+        sns.barplot(x="State", y="Mean_simi", data=mean_simi_df, color="gray", ax=ax)
+        ax.set_xlabel("State")
+        ax.set_ylabel("Mean similarity")
+        ax.set_ylim(0.4, 1)
+        return fig
 
     """
     *****************************************************************************
@@ -991,13 +1063,49 @@ class HmmModelSelector(object):
     """
 
     def auto_parse(self):
+        out = self.output_dir + f"model_selection/"
+        if not os.path.exists(out):
+            os.makedirs(out)
+        simi_out = f"{out}simi/"
+        if not os.path.exists(simi_out):
+            os.makedirs(simi_out)
+        chrono_out = f"{out}chrono/"
+        if not os.path.exists(chrono_out):
+            os.makedirs(chrono_out)
+        mean_simi_df_fig = self.plot_mean_simi()
+        mean_simi_df_fig.savefig(f"{simi_out}mean_simi.png")
+        plt.close(mean_simi_df_fig)
         for state_k in self.krange:
             simi_matrix = self.calc_simi_matrix(state_k)
-            self.plot_simi_matrix(state_k, simi_matrix)
+            fig = self.plot_simi_matrix(simi_matrix)
+            fig.savefig(f"{simi_out}k{state_k}.png")
+            plt.close(fig)
             vpath_max_fo, gamma_max_fo, switch = self.__get_subj_chronnectome(state_k)
-            self.concat_chronnectome()
-            # self.plot_chronnectome()
+            fig = self.plot_chronnectome(state_k)
+            fig.savefig(f"{chrono_out}k{state_k}.png")
+            plt.close(fig)
+
         return
 
     def generate_report(self):
-        pass
+        self.auto_parse()
+        out = self.output_dir + f"model_selection/"
+        if not os.path.exists(out):
+            os.makedirs(out)
+        html_file = f"{out}report.html"
+        with open(html_file, "w") as f:
+            f.write("<html><body>\n")
+            f.write("<h1>Model Selection</h1>\n")
+            f.write("<h2>Mean Similarity</h2>\n")
+            f.write("<img src='simi/mean_simi.png'>\n")
+            f.write("<h2>Similarity Matrix</h2>\n")
+            for state_k in self.krange:
+                f.write(f"<h3>{state_k} States</h3>\n")
+                f.write(f"<img src='simi/k{state_k}.png'>\n")
+            f.write("<h2>Chronnectome</h2>\n")
+            for state_k in self.krange:
+                f.write(f"<h3>{state_k} States</h3>\n")
+                f.write(f"<img src='chrono/k{state_k}.png'>\n")
+            f.write("</body></html>\n")
+
+        return
