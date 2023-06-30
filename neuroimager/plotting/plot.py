@@ -4,24 +4,6 @@ import seaborn as sns
 from scipy.stats import gaussian_kde
 
 
-def update_matplotlib_fontsize():
-    parameters = {
-        "axes.labelsize": 20,
-        "axes.titlesize": 20,
-        "figure.titlesize": 20,
-        "xtick.labelsize": 20,
-        "ytick.labelsize": 20,
-        "legend.fontsize": 15,
-        "legend.title_fontsize": 16,
-        "axes.titleweight": "bold",
-        "axes.labelweight": "bold",
-        "figure.titleweight": "bold",
-        "font.weight": "bold",
-        "font.sans-serif": "Arial",
-    }
-    plt.rcParams.update(parameters)
-
-
 def get_sig(sig):
     symbol = ""
     if 0.01 < sig < 0.05:
