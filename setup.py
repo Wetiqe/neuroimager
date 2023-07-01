@@ -8,7 +8,7 @@ with open(os.path.join(current_dir, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="neuroimager",
-    version="0.0.6",
+    version="0.0.7",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
@@ -26,6 +26,8 @@ setup(
         "sklearn",
         "nilearn",
         "networkx",
+        "munkres",
+        "scikit-network",
     ],
     classifiers=[
         "Development Status :: 1 - Planning",

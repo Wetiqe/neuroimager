@@ -2,7 +2,9 @@
 
 A collection of utilities used for MRI data analysis
 
+# Automatic Analysis of HMM model estimated by HMM-MAR
 
+To be done
 
 # Atlas Operation
 Suggest you have two probability atlas:
