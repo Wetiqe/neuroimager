@@ -58,7 +58,7 @@ class HmmParser(object):
         self.K = int(self.hmm["K"])
         self.states_info = {}
         if auto_parse:
-            self.vpath_chronnectome = self.parse_chronnectome()
+            self.chronnectome = self.parse_chronnectome()
             for i, (mean, conn) in enumerate(zip(self.get_means(), self.get_conns())):
                 self.states_info[f"state{i}"] = {"mean": mean, "conn": conn}
             self.P = self.transition_matrix()
@@ -289,8 +289,7 @@ class HmmParser(object):
     """
 
     # Calculate Vpath features
-    @staticmethod
-    def vpath_fo(vpath):
+    def vpath_fo(self, vpath):
         state_fo = dict()
         length = len(vpath)
         k_states = len(np.unique(vpath))
@@ -298,6 +297,8 @@ class HmmParser(object):
         max_state = 0
         for state in range(1, k_states + 1):
             fo = [np.count_nonzero(vpath == state) / length]
+            if fo == np.nan:
+                fo = 0
             state_fo[f"state{state}_fo"] = fo
             if state == 1:
                 max_fo = fo
@@ -318,11 +319,10 @@ class HmmParser(object):
 
         return gamma_fo_df
 
-    @staticmethod
-    def vpath_visit(vpath):
+    def vpath_visit(self, vpath):
         dic = dict()
         length = len(vpath)
-        k_states = len(np.unique(vpath))
+        k_states = self.K
         for state in range(1, k_states + 1):
             vpath_bool = vpath == state
             visit = 0
@@ -356,11 +356,10 @@ class HmmParser(object):
 
         return pd.DataFrame.from_dict(dic)
 
-    @staticmethod
-    def vpath_lifetime(vpath, mean=True):
+    def vpath_lifetime(self, vpath, mean=True):
         dic = dict()
         length = len(vpath)
-        k_states = len(np.unique(vpath))
+        k_states = self.K
         for state in range(1, k_states + 1):
             lifes = []
             vpath_bool = vpath == state
@@ -368,13 +367,11 @@ class HmmParser(object):
             for i in range(length):
                 if vpath_bool[i]:
                     life += 1
-                elif (vpath_bool[i] is False) & (life > 0):
+                elif (vpath_bool[i] == False) & (life > 0):
                     lifes.append(life)
                     life = 0
-                else:
-                    pass
             if len(lifes) == 0:
-                dic[f"state{state}_interval"] = [0]
+                dic[f"state{state}_lifetime"] = [0]
             elif mean:
                 dic[f"state{state}_lifetime"] = [np.mean(lifes)]
             else:
@@ -382,11 +379,10 @@ class HmmParser(object):
 
         return pd.DataFrame.from_dict(dic)
 
-    @staticmethod
-    def vpath_interval(vpath, mean=True):
+    def vpath_interval(self, vpath, mean=True):
         dic = dict()
         length = len(vpath)
-        k_states = len(np.unique(vpath))
+        k_states = self.K
         for state in range(1, k_states + 1):
             intervals = []
             vpath_bool = vpath == state
@@ -394,11 +390,9 @@ class HmmParser(object):
             for i in range(length):
                 if not vpath_bool[i]:
                     interval += 1
-                elif (vpath_bool[i] is True) & (interval > 0):
+                elif (vpath_bool[i] == True) & (interval > 0):
                     intervals.append(interval)
                     interval = 0
-                else:
-                    pass
             if len(intervals) == 0:
                 dic[f"state{state}_interval"] = [0]
             elif mean:
