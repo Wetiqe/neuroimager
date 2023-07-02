@@ -12,6 +12,10 @@ from neuroimager.utils.fc import (
     average_nodes,
 )
 
+from neuroimager.utils.ml import (
+    evaluate_continuous,
+    evaluate_binary,
+)
 __all__ = [
     "split_schafer_names",
     "combine_atlases",
@@ -22,4 +26,6 @@ __all__ = [
     "filter_fcs",
     "extract_bipartite_matrix",
     "average_nodes",
+    "evaluate_continuous",
+    "evaluate_binary",
 ]
