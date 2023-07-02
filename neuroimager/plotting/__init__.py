@@ -7,6 +7,7 @@ from neuroimager.plotting.plot import (
 
 from neuroimager.plotting.styler import (
     large_font_size,
+    small_font_size,
     no_edge,
 )
 
@@ -16,5 +17,6 @@ __all__ = [
     "get_sig",
     "plot_time_series",
     "large_font_size",
+    "small_font_size",
     "no_edge",
 ]

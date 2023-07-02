@@ -21,6 +21,19 @@ def large_font_size():
     plt.rcParams.update(parameters)
 
 
+def small_font_size():
+    parameters = {
+        "axes.labelsize": 6,
+        "axes.titlesize": 12,
+        "figure.titlesize": 12,
+        "xtick.labelsize": 6,
+        "ytick.labelsize": 6,
+        "legend.fontsize": 8,
+        "legend.title_fontsize": 8,
+    }
+    plt.rcParams.update(parameters)
+
+
 def no_edge(ax):
     sns.set_style("white")
     ax.spines["right"].set_color("none")
