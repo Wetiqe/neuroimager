@@ -1,26 +1,23 @@
-import os
-import gc
 import csv
-
-import bids.layout.models
+import os
 from tqdm import tqdm
-from typing import Callable, List, Union, Optional
+from typing import Callable, List, Optional
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
+from sklearn.base import BaseEstimator, TransformerMixin
 import nibabel as nib
-from bids import BIDSLayout
+import bids.layout.models
+
+from nilearn.glm.first_level import FirstLevelModel, check_design_matrix
+from nilearn.glm.second_level import SecondLevelModel, non_parametric_inference
 from nilearn.image import clean_img
-from nilearn.glm.first_level import FirstLevelModel
-from nilearn.glm.second_level import SecondLevelModel
-from nilearn.glm.thresholding import threshold_stats_img
 from nilearn.plotting import plot_design_matrix, plot_contrast_matrix
 from nilearn.plotting import plot_stat_map, view_img_on_surf, plot_glass_brain
 
 
-class TaskFmri(object):
+class TaskFmri(BaseEstimator, TransformerMixin, object):
     def __init__(self, tr: int, contrasts: list or dict, out_dir: str):
         self.tr = tr
         self.contrasts = contrasts
@@ -76,7 +73,7 @@ class TaskFmri(object):
         return return_dict
 
     def plot_single_stat(
-        self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
+            self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
     ):
         if plot_kwargs is None and plot == "3D":
             plot_kwargs = {
@@ -128,7 +125,7 @@ class TaskFmri(object):
 
     # TODO: Add thresholding
     def thresh_stat(
-        self,
+            self,
     ):
         pass
 
@@ -136,14 +133,14 @@ class TaskFmri(object):
         pass
 
     def plot_all_stat(
-        self, list_stat_maps: list, out_name_prefix, plot_kwargs=None, save=True
+            self, list_stat_maps: list, out_name_prefix, plot_kwargs=None, save=True
     ):
         for idx, stat_map in enumerate(list_stat_maps):
             if idx % 25 == 0:
                 if idx != 0 and save:
                     plt.savefig(
                         os.path.join(
-                            self.out_dir, f"{out_name_prefix}_zmap_{idx% 25 + 1}.png"
+                            self.out_dir, f"{out_name_prefix}_zmap_{idx % 25 + 1}.png"
                         )
                     )
                     plt.close()
@@ -176,15 +173,19 @@ class TaskFmri(object):
 
 class FirstLevelPipe(TaskFmri):
     def __init__(
-        self,
-        tr,
-        imgs: List[bids.layout.models.BIDSImageFile],
-        confounds: List[str or pd.DataFrame],
-        events: List[str or pd.DataFrame],
-        contrasts: List[str] or dict,
-        out_dir: str,
-        first_level_kwargs: dict = None,
+            self,
+            tr: float or int,
+            contrasts: List[str] or dict,
+            out_dir: str,
+            imgs: List[bids.layout.models.BIDSImageFile] = None,
+            confounds: List[str or pd.DataFrame] = None,
+            events: List[str or pd.DataFrame] = None,
+            first_level_kwargs: dict = None,
     ):
+        """
+
+        Note: The imgs, confounds, events can be empty here, in that case they must be specified in the fit method.
+        """
         super().__init__(tr, contrasts, out_dir)
         self.out_dir = out_dir + "/first_level"
         os.makedirs(self.out_dir, exist_ok=True)
@@ -211,27 +212,32 @@ class FirstLevelPipe(TaskFmri):
             raise ValueError("Contrasts must be either dict or list")
 
     def process_subject(
-        self,
-        img: nib.nifti1.Nifti1Image,
-        confound,
-        event,
-        out_prefix,
-        plot_design=True,
+            self,
+            img: nib.nifti1.Nifti1Image,
+            confound: pd.DataFrame,
+            event: pd.DataFrame,
+            out_prefix: str,
+            plot_design: bool = True,
     ):
         fmri_glm = FirstLevelModel(**self.first_level_kwargs)
         fmri_glm = fmri_glm.fit(img, events=event, confounds=confound)  # fit the model
         design_matrix = fmri_glm.design_matrices_[0]
-        if plot_design:
-            self.plot_design_matrix(design_matrix, out_prefix)
+        design_validity = self.__check_design(design_matrix)
+        if design_validity == "valid":
+            if plot_design:
+                self.plot_design_matrix(design_matrix, out_prefix)
+        else:
+            print(f"Design matrix for {out_prefix} is {design_validity}")
         del img  # release the memory
         subj_results = self.loop_through_contrasts(fmri_glm, out_prefix)
 
         return subj_results
 
     def loop_through_subjects(
-        self,
-        preproc_func: Optional[Callable] or str = None,
-        confound_items: List[str] = None,
+            self,
+            preproc_func: Optional[Callable] or str = None,
+            confound_items: List[str] = None,
+            out_prefixes: List[str] = None,
     ):
         if confound_items is None:
             confound_items = [
@@ -244,12 +250,19 @@ class FirstLevelPipe(TaskFmri):
                 "rot_y",
                 "rot_z",
             ]
-        for bids_img, confound_name, event_name in tqdm(
-            zip(self.imgs, self.confounds, self.events)
+        i = 0
+        for img, confound_name, event_name in tqdm(
+                zip(self.imgs, self.confounds, self.events)
         ):
-            out_prefix = bids_img.get_entities()["subject"]
+            if isinstance(img, bids.layout.models.BIDSImageFile):
+                out_prefix = img.get_entities()["subject"]
+                img = img.get_image()
+            else:
+                out_prefix = f"sub-{i}"
+                img = load_imgs(img)
+            if out_prefixes is not None:
+                out_prefix = out_prefixes[i]
             tqdm.write(f"Processing subject {out_prefix}")
-            img = bids_img.get_image()
             if isinstance(preproc_func, Callable):
                 img = preproc_func(img)
             elif preproc_func == "default":
@@ -261,6 +274,7 @@ class FirstLevelPipe(TaskFmri):
             subj_results = self.process_subject(img, confound, event, out_prefix)
             for contrast, imgs in subj_results.items():
                 self.to_second_level[contrast].append(imgs["z"])
+            i += 1
 
     def prep_img(self, img, **kwargs):
         default_kwargs = {
@@ -275,20 +289,63 @@ class FirstLevelPipe(TaskFmri):
         preprocessed_img = clean_img(img, t_r=self.tr, **default_kwargs)
         return preprocessed_img
 
+    @staticmethod
+    def __check_design(design):
+        # TODO: check if design is valid
+        frame_times, matrix, names = check_design_matrix(design)
+        return "valid"
+
+    def fit(self, X, y=None):
+        # X is expected to be a tuple containing (imgs, confounds, events)
+        # You may need to modify this depending on your specific input structure
+        imgs, confounds, events = X
+
+        self.imgs = imgs
+        self.confounds = confounds
+        self.events = events
+
+        self.loop_through_subjects()
+
+        return self
+
+    def transform(self, X, y=None):
+        # You can return the `to_second_level` attribute here,
+        # as it contains the results of first-level analysis
+        return self.to_second_level
+
 
 class HigherLevelPipe(TaskFmri):
     def __init__(
-        self,
-        tr,
-        stat_maps: dict,
-        contrasts: List[str] or dict,
-        out_dir: str,
-        second_level_kwargs: dict = None,
+            self,
+            tr: float or int,
+            design_matrix: pd.DataFrame,
+            contrasts: List[str] or dict,
+            out_dir: str,
+            stat_maps: dict = None,
+            nonparametric: bool = False,
+            higher_level_kwargs: dict = None,
     ):
+        """
+        Higher level analysis pipeline
+
+        Note: stat_maps is a dict containing the first level results, it can be empty when initializing the class
+        In that case it must be specified in the fit method
+
+        Parameters
+        ----------
+        tr
+        design_matrix
+        contrasts
+        out_dir
+        stat_maps
+        nonparametric
+        higher_level_kwargs
+        """
         super().__init__(tr, contrasts, out_dir)
         self.out_dir = out_dir + "/second_level"
         os.makedirs(self.out_dir, exist_ok=True)
-        self.imgs = stat_maps
+        self.stat_maps = stat_maps
+        self.design_matrix = design_matrix
         self.higher_results = {}
         if isinstance(contrasts, dict):
             for key, value in contrasts.items():
@@ -298,24 +355,69 @@ class HigherLevelPipe(TaskFmri):
                 self.higher_results[contrast] = []
         else:
             raise ValueError("Contrasts must be either dict or list")
+        self.nonparametric = nonparametric
         self.second_level_kwargs = {}
-        self.second_level_kwargs.update(second_level_kwargs)
+        self.second_level_kwargs.update(higher_level_kwargs)
 
-    def process_single_1level_contrast(self, stat_map, out_prefix):
-        second_level_model = SecondLevelModel(**self.second_level_kwargs)
-        second_level_model = second_level_model.fit(stat_map)
-        del stat_map
+    def process_single_1level_contrast(self, stat_maps, out_prefix):
+        if self.nonparametric:
+            second_level_model = non_parametric_inference(
+                **self.second_level_kwargs
+            )
+        else:
+            second_level_model = SecondLevelModel(**self.second_level_kwargs)
+        second_level_model = second_level_model.fit(stat_maps, design_matrix=self.design_matrix)
+        del stat_maps
         higher_level_results = self.loop_through_contrasts(
             second_level_model, out_prefix
         )
         return higher_level_results
 
     def loop_all_1level_contrasts(self):
-        for contrast_1level, stat_maps in tqdm(self.imgs.items()):
+        for contrast_1level, stat_maps in tqdm(self.stat_maps.items()):
             tqdm.write(f"Processing contrast {contrast_1level}")
             out_prefix = contrast_1level
+            stat_maps = load_imgs(stat_maps)
             group_results = self.process_single_1level_contrast(stat_maps, out_prefix)
             for contrast, imgs in group_results.items():
                 self.higher_results[contrast].append(imgs["z"])
 
         return self.higher_results
+
+    def fit(self, X, y=None):
+        # X is expected to be a dictionary containing {contrast: [stat_maps]}
+        self.stat_maps = X
+        self.loop_all_1level_contrasts()
+
+        return self
+
+    def transform(self, X, y=None):
+        # Return the `higher_results` attribute here,
+        # as it contains the results of the second-level analysis
+        return self.higher_results
+
+
+def load_imgs(imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.BIDSImageFile):
+    if isinstance(imgs, str):
+        return nib.load(imgs)
+    elif isinstance(imgs, nib.nifti1.Nifti1Image):
+        return imgs
+    elif isinstance(imgs, bids.layout.models.BIDSImageFile):
+        return imgs.get_image()
+    try:
+        imgs = list(imgs)
+    except TypeError:
+        raise ValueError("If imgs is not a single file, then imgs must can be converted to list")
+    try:
+        if isinstance(imgs[0], str):
+            imgs = [nib.load(stat_map) for stat_map in imgs]
+        elif isinstance(imgs[0], bids.layout.models.BIDSImageFile):
+            imgs = [img.get_image() for img in imgs]
+        elif isinstance(imgs[0], nib.nifti1.Nifti1Image):
+            pass
+        else:
+            raise ValueError("imgs must be list of str/nib.Nifti1Image/BIDSImageFile")
+    except IndexError:
+        print("imgs must be non-empty")
+
+    return imgs
