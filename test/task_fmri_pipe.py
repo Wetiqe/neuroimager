@@ -102,10 +102,8 @@ all_img = hcs + pts
 higher_design = pd.DataFrame(
     [
         [1] * len(hcs) + [-1] * len(pts),
-        ],
-    index=[
-        "HC-PT"
     ],
+    index=["HC-PT"],
 ).T
 
 higher_contrasts = {
