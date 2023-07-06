@@ -5,6 +5,7 @@ from typing import Callable, List, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 from sklearn.base import BaseEstimator, TransformerMixin
 import nibabel as nib
@@ -388,21 +389,21 @@ class HigherLevelPipe(TaskFmri):
         else:
             raise ValueError("Contrasts must be either dict or list")
         self.nonparametric = non_parametric
-        self.second_level_kwargs = {}
-        self.second_level_kwargs.update(higher_level_kwargs)
+        self.model_kwargs = {}
+        self.model_kwargs.update(higher_level_kwargs)
 
     def process_single_1level_contrast(self, stat_maps, out_prefix):
         if self.nonparametric:
-            second_level_model = non_parametric_inference(**self.second_level_kwargs)
+            second_level_model = non_parametric_inference(**self.model_kwargs)
         else:
-            second_level_model = SecondLevelModel(**self.second_level_kwargs)
-        second_level_model = second_level_model.fit(
-            stat_maps, design_matrix=self.design_matrix
-        )
-        del stat_maps
-        higher_level_results = self.loop_through_contrasts(
-            second_level_model, out_prefix
-        )
+            second_level_model = SecondLevelModel(**self.model_kwargs)
+            second_level_model = second_level_model.fit(
+                stat_maps, design_matrix=self.design_matrix
+            )
+            del stat_maps
+            higher_level_results = self.loop_through_contrasts(
+                second_level_model, out_prefix
+            )
         return higher_level_results
 
     def loop_all_1level_contrasts(self):
@@ -415,6 +416,93 @@ class HigherLevelPipe(TaskFmri):
                 self.higher_results[contrast].append(imgs["z"])
 
         return self.higher_results
+
+    def loop_through_contrasts_nonparametric(self, stat_maps, output_prefix):
+        """
+        References: https://nilearn.github.io/dev/modules/generated/nilearn.glm.second_level.non_parametric_inference.html#nilearn.glm.second_level.non_parametric_inference
+        """
+        return_dict = dict()
+        if isinstance(self.contrasts, dict):
+            conditions, con_matrix_all = self.contrasts.items()
+        elif isinstance(self.contrasts, list):
+            conditions = self.contrasts
+            con_matrix_all = [None for i in range(len(conditions))]
+        else:
+            raise TypeError(
+                "Contrasts must be a list of conditions or a dictionary of conditions and contrast matrices"
+            )
+        for condition, con_matrix in zip(conditions, con_matrix_all):
+            if con_matrix is None:
+                contrast = condition
+            else:
+                contrast = con_matrix
+            if self.model_kwargs["tfce"] or self.model_kwargs["threshold"]:
+                out_dic = non_parametric_inference(
+                    stat_maps,
+                    design_matrix=self.design_matrix,
+                    second_level_contrast=contrast,
+                    **self.model_kwargs,
+                )
+                return_dict[condition] = out_dic
+                self.plot_cluster_results(out_dic, output_prefix + "_" + condition)
+            else:
+                neg_log10_vfwe_pvals_img = non_parametric_inference(
+                    stat_maps,
+                    design_matrix=self.design_matrix,
+                    second_level_contrast=contrast,
+                    **self.model_kwargs,
+                )
+                return_dict[condition] = neg_log10_vfwe_pvals_img
+                # save img
+                neg_log10_vfwe_pvals_img.to_filename(
+                    f"{output_prefix}_{condition}_FWER-corrected_p.nii.gz"
+                )
+
+        return return_dict
+
+    def plot_cluster_results(self, results, output_prefix):
+        threshold = -np.log(0.05)
+        vmax = -np.log(1 / self.model_kwargs["n_perm"])
+
+        images = []
+        titles = []
+        for img_name, img in results.items():
+            img.to_filename(f"{output_prefix}_{img_name}.nii.gz")
+            if img_name in [
+                "logp_max_t",
+                "logp_max_size",
+                "logp_max_mass",
+                "logp_max_tfce",
+            ]:
+                images.append(results[img_name])
+            if img_name == "logp_max_t":
+                titles.append("Permutation Test\n(Voxel-Level Error Control)")
+            elif img_name == "logp_max_size":
+                titles.append("Permutation Test\n(Cluster-Size Error Control)")
+            elif img_name == "logp_max_mass":
+                titles.append("Permutation Test\n(Cluster-Mass Error Control)")
+            elif img_name == "logp_max_tfce":
+                titles.append("Permutation Test\n(TFCE Error Control)")
+
+        fig, axes = plt.subplots(figsize=(8, 8), nrows=2, ncols=2)
+        axes = axes.ravel()
+        for img_counter, ax in enumerate(axes):
+            if img_counter >= len(images):
+                break
+            plot_glass_brain(
+                images[img_counter],
+                colorbar=True,
+                vmax=vmax,
+                display_mode="z",
+                plot_abs=False,
+                threshold=threshold,
+                figure=fig,
+                axes=ax,
+            )
+            ax.set_title(titles[img_counter])
+        fig.suptitle("Higher level results")
+        fig.savefig(f"{output_prefix}_higher_level_results.png")
+        plt.close()
 
     def fit(self, X, y=None):
         # X is expected to be a dictionary containing {contrast: [stat_maps]}
