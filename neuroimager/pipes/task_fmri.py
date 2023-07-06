@@ -40,28 +40,51 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
             out_dir = self.out_dir + "GLM/"
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        plot_contrast_matrix(self.contrasts)
-        name = "contrast_matrix.png"
-        if prefix:
-            name = prefix + "_" + name
-        plt.savefig(out_dir + name)
-        plt.close()
+        if isinstance(self.contrasts, dict):
+            for contrast_name, contrast_matrix in self.contrasts.items():
+                plot_contrast_matrix(contrast_matrix)
+                name = f"{contrast_name}_contrast_matrix.png"
+                if prefix:
+                    name = prefix + "_" + name
+                plt.savefig(out_dir + name)
+                plt.close()
+        elif isinstance(self.contrasts, list):
+            if isinstance(self.contrasts[0], str):
+                raise TypeError("Can only plot matrix not contrast name")
+            else:
+                raise NotImplementedError(
+                    "Only supports the plotting of contrast matrix"
+                )
 
     def loop_through_contrasts(self, fmri_glm, output_prefix):
         return_dict = dict()
-        for condition, con_matrix in self.contrasts.items():
+        if isinstance(self.contrasts, dict):
+            conditions, con_matrix_all = self.contrasts.items()
+        elif isinstance(self.contrasts, list):
+            conditions = self.contrasts
+            con_matrix_all = [None for i in range(len(conditions))]
+        else:
+            raise TypeError(
+                "Contrasts must be a list of conditions or a dictionary of conditions and contrast matrices"
+            )
+        for condition, con_matrix in zip(conditions, con_matrix_all):
             effect_fname = f"{output_prefix}_{condition}_effect.nii.gz"
             z_fname = f"{output_prefix}_{condition}_z.nii.gz"
             p_value_fname = f"{output_prefix}_{condition}_p.nii.gz"
-            fmri_glm.compute_contrast(
-                con_matrix, output_type="effect_size"
-            ).to_filename(os.path.join(self.out_dir, effect_fname))
+            if con_matrix is None:
+                contrast = condition
+            else:
+                contrast = con_matrix
 
-            fmri_glm.compute_contrast(con_matrix, output_type="z_score").to_filename(
+            fmri_glm.compute_contrast(contrast, output_type="effect_size").to_filename(
+                os.path.join(self.out_dir, effect_fname)
+            )
+
+            fmri_glm.compute_contrast(contrast, output_type="z_score").to_filename(
                 os.path.join(self.out_dir, z_fname)
             )
 
-            fmri_glm.compute_contrast(con_matrix, output_type="p_value").to_filename(
+            fmri_glm.compute_contrast(contrast, output_type="p_value").to_filename(
                 os.path.join(self.out_dir, p_value_fname)
             )
             return_dict[condition] = {
@@ -73,7 +96,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
         return return_dict
 
     def plot_single_stat(
-            self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
+        self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
     ):
         if plot_kwargs is None and plot == "3D":
             plot_kwargs = {
@@ -125,7 +148,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
 
     # TODO: Add thresholding
     def thresh_stat(
-            self,
+        self,
     ):
         pass
 
@@ -133,7 +156,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
         pass
 
     def plot_all_stat(
-            self, list_stat_maps: list, out_name_prefix, plot_kwargs=None, save=True
+        self, list_stat_maps: list, out_name_prefix, plot_kwargs=None, save=True
     ):
         for idx, stat_map in enumerate(list_stat_maps):
             if idx % 25 == 0:
@@ -173,26 +196,28 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
 
 class FirstLevelPipe(TaskFmri):
     def __init__(
-            self,
-            tr: float or int,
-            contrasts: List[str] or dict,
-            out_dir: str,
-            imgs: List[bids.layout.models.BIDSImageFile] = None,
-            confounds: List[str or pd.DataFrame] = None,
-            events: List[str or pd.DataFrame] = None,
-            first_level_kwargs: dict = None,
+        self,
+        tr: float or int,
+        contrasts: List[str] or dict,
+        out_dir: str,
+        imgs: List[bids.layout.models.BIDSImageFile] = None,
+        confounds: List[str or pd.DataFrame] = None,
+        events: List[str or pd.DataFrame] = None,
+        first_level_kwargs: dict = None,
     ):
         """
 
         Note: The imgs, confounds, events can be empty here, in that case they must be specified in the fit method.
         """
         super().__init__(tr, contrasts, out_dir)
-        self.out_dir = out_dir + "/first_level"
+        self.out_dir = out_dir
         os.makedirs(self.out_dir, exist_ok=True)
+        self.tr = tr
         self.imgs = imgs
         self.confounds = confounds
         self.events = events
         self.first_level_kwargs = {
+            "t_r": self.tr,
             "noise_model": "ar1",
             "hrf_model": "spm",
             "drift_model": "cosine",
@@ -212,12 +237,12 @@ class FirstLevelPipe(TaskFmri):
             raise ValueError("Contrasts must be either dict or list")
 
     def process_subject(
-            self,
-            img: nib.nifti1.Nifti1Image,
-            confound: pd.DataFrame,
-            event: pd.DataFrame,
-            out_prefix: str,
-            plot_design: bool = True,
+        self,
+        img: nib.nifti1.Nifti1Image,
+        confound: pd.DataFrame,
+        event: pd.DataFrame,
+        out_prefix: str,
+        plot_design: bool = True,
     ):
         fmri_glm = FirstLevelModel(**self.first_level_kwargs)
         fmri_glm = fmri_glm.fit(img, events=event, confounds=confound)  # fit the model
@@ -234,10 +259,10 @@ class FirstLevelPipe(TaskFmri):
         return subj_results
 
     def loop_through_subjects(
-            self,
-            preproc_func: Optional[Callable] or str = None,
-            confound_items: List[str] = None,
-            out_prefixes: List[str] = None,
+        self,
+        preproc_func: Optional[Callable] or str = None,
+        confound_items: List[str] = None,
+        out_prefixes: List[str] = None,
     ):
         if confound_items is None:
             confound_items = [
@@ -252,7 +277,7 @@ class FirstLevelPipe(TaskFmri):
             ]
         i = 0
         for img, confound_name, event_name in tqdm(
-                zip(self.imgs, self.confounds, self.events)
+            zip(self.imgs, self.confounds, self.events)
         ):
             if isinstance(img, bids.layout.models.BIDSImageFile):
                 out_prefix = img.get_entities()["subject"]
@@ -316,14 +341,14 @@ class FirstLevelPipe(TaskFmri):
 
 class HigherLevelPipe(TaskFmri):
     def __init__(
-            self,
-            tr: float or int,
-            design_matrix: pd.DataFrame,
-            contrasts: List[str] or dict,
-            out_dir: str,
-            stat_maps: dict = None,
-            nonparametric: bool = False,
-            higher_level_kwargs: dict = None,
+        self,
+        tr: float or int,
+        design_matrix: pd.DataFrame,
+        contrasts: List[str] or dict,
+        out_dir: str,
+        stat_maps: dict = None,
+        nonparametric: bool = False,
+        higher_level_kwargs: dict = None,
     ):
         """
         Higher level analysis pipeline
@@ -342,7 +367,7 @@ class HigherLevelPipe(TaskFmri):
         higher_level_kwargs
         """
         super().__init__(tr, contrasts, out_dir)
-        self.out_dir = out_dir + "/second_level"
+        self.out_dir = out_dir
         os.makedirs(self.out_dir, exist_ok=True)
         self.stat_maps = stat_maps
         self.design_matrix = design_matrix
@@ -361,12 +386,12 @@ class HigherLevelPipe(TaskFmri):
 
     def process_single_1level_contrast(self, stat_maps, out_prefix):
         if self.nonparametric:
-            second_level_model = non_parametric_inference(
-                **self.second_level_kwargs
-            )
+            second_level_model = non_parametric_inference(**self.second_level_kwargs)
         else:
             second_level_model = SecondLevelModel(**self.second_level_kwargs)
-        second_level_model = second_level_model.fit(stat_maps, design_matrix=self.design_matrix)
+        second_level_model = second_level_model.fit(
+            stat_maps, design_matrix=self.design_matrix
+        )
         del stat_maps
         higher_level_results = self.loop_through_contrasts(
             second_level_model, out_prefix
@@ -397,7 +422,9 @@ class HigherLevelPipe(TaskFmri):
         return self.higher_results
 
 
-def load_imgs(imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.BIDSImageFile):
+def load_imgs(
+    imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.BIDSImageFile,
+):
     if isinstance(imgs, str):
         return nib.load(imgs)
     elif isinstance(imgs, nib.nifti1.Nifti1Image):
@@ -407,7 +434,9 @@ def load_imgs(imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.
     try:
         imgs = list(imgs)
     except TypeError:
-        raise ValueError("If imgs is not a single file, then imgs must can be converted to list")
+        raise ValueError(
+            "If imgs is not a single file, then imgs must can be converted to list"
+        )
     try:
         if isinstance(imgs[0], str):
             imgs = [nib.load(stat_map) for stat_map in imgs]
