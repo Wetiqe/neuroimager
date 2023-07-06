@@ -203,6 +203,7 @@ class FirstLevelPipe(TaskFmri):
         imgs: List[bids.layout.models.BIDSImageFile] = None,
         confounds: List[str or pd.DataFrame] = None,
         events: List[str or pd.DataFrame] = None,
+        prep_func: str or Callable or None = None,
         first_level_kwargs: dict = None,
     ):
         """
@@ -225,6 +226,7 @@ class FirstLevelPipe(TaskFmri):
             "signal_scaling": False,
             "minimize_memory": True,
         }
+        self.prep_func = prep_func
         self.first_level_kwargs.update(first_level_kwargs)
         self.to_second_level = {}
         if isinstance(contrasts, dict):
@@ -288,13 +290,18 @@ class FirstLevelPipe(TaskFmri):
             if out_prefixes is not None:
                 out_prefix = out_prefixes[i]
             tqdm.write(f"Processing subject {out_prefix}")
-            if isinstance(preproc_func, Callable):
-                img = preproc_func(img)
-            elif preproc_func == "default":
+            if isinstance(self.prep_func, Callable):
+                img = self.prep_func(img)
+            elif self.prep_func == "default":
                 img = self.prep_img(img)
-            elif isinstance(preproc_func, str):
+            elif isinstance(self.prep_func, str):
                 img = self.prep_img(img)
-            confound = self.__load_csv(confound_name)[confound_items]
+            elif self.prep_func is None:
+                pass
+            if confound_name is None:
+                confound = None
+            else:
+                confound = self.__load_csv(confound_name)[confound_items]
             event = self.__load_csv(event_name)
             subj_results = self.process_subject(img, confound, event, out_prefix)
             for contrast, imgs in subj_results.items():
@@ -347,7 +354,7 @@ class HigherLevelPipe(TaskFmri):
         contrasts: List[str] or dict,
         out_dir: str,
         stat_maps: dict = None,
-        nonparametric: bool = False,
+        non_parametric: bool = False,
         higher_level_kwargs: dict = None,
     ):
         """
@@ -380,7 +387,7 @@ class HigherLevelPipe(TaskFmri):
                 self.higher_results[contrast] = []
         else:
             raise ValueError("Contrasts must be either dict or list")
-        self.nonparametric = nonparametric
+        self.nonparametric = non_parametric
         self.second_level_kwargs = {}
         self.second_level_kwargs.update(higher_level_kwargs)
 
