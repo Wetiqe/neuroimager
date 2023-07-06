@@ -60,7 +60,8 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
     def loop_through_contrasts(self, fmri_glm, output_prefix):
         return_dict = dict()
         if isinstance(self.contrasts, dict):
-            conditions, con_matrix_all = self.contrasts.items()
+            conditions = self.contrasts.keys()
+            con_matrix_all = self.contrasts.values()
         elif isinstance(self.contrasts, list):
             conditions = self.contrasts
             con_matrix_all = [None for i in range(len(conditions))]
@@ -76,7 +77,6 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                 contrast = condition
             else:
                 contrast = con_matrix
-
             fmri_glm.compute_contrast(contrast, output_type="effect_size").to_filename(
                 os.path.join(self.out_dir, effect_fname)
             )
@@ -89,9 +89,9 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                 os.path.join(self.out_dir, p_value_fname)
             )
             return_dict[condition] = {
-                "effect": effect_fname,
-                "z": z_fname,
-                "p": p_value_fname,
+                "effect": self.out_dir + effect_fname,
+                "z": self.out_dir + z_fname,
+                "p": self.out_dir + p_value_fname,
             }
 
         return return_dict
@@ -185,7 +185,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
             cidx += 1
 
     @staticmethod
-    def __load_csv(csv_file):
+    def _load_csv(csv_file):
         if isinstance(csv_file, str):
             with open(csv_file, "r") as file:
                 dialect = csv.Sniffer().sniff(file.read(1024))
@@ -203,6 +203,7 @@ class FirstLevelPipe(TaskFmri):
         out_dir: str,
         imgs: List[bids.layout.models.BIDSImageFile] = None,
         confounds: List[str or pd.DataFrame] = None,
+        confound_items: List[str] = None,
         events: List[str or pd.DataFrame] = None,
         prep_func: str or Callable or None = None,
         first_level_kwargs: dict = None,
@@ -228,6 +229,7 @@ class FirstLevelPipe(TaskFmri):
             "minimize_memory": True,
         }
         self.prep_func = prep_func
+        self.confound_items = confound_items
         self.first_level_kwargs.update(first_level_kwargs)
         self.to_second_level = {}
         if isinstance(contrasts, dict):
@@ -247,6 +249,7 @@ class FirstLevelPipe(TaskFmri):
         out_prefix: str,
         plot_design: bool = True,
     ):
+        event = event[["trial_type", "onset", "duration"]]
         fmri_glm = FirstLevelModel(**self.first_level_kwargs)
         fmri_glm = fmri_glm.fit(img, events=event, confounds=confound)  # fit the model
         design_matrix = fmri_glm.design_matrices_[0]
@@ -263,12 +266,10 @@ class FirstLevelPipe(TaskFmri):
 
     def loop_through_subjects(
         self,
-        preproc_func: Optional[Callable] or str = None,
-        confound_items: List[str] = None,
         out_prefixes: List[str] = None,
     ):
-        if confound_items is None:
-            confound_items = [
+        if self.confound_items is None:
+            self.confound_items = [
                 "white_matter",
                 "framewise_displacement",
                 "trans_x",
@@ -302,8 +303,8 @@ class FirstLevelPipe(TaskFmri):
             if confound_name is None:
                 confound = None
             else:
-                confound = self.__load_csv(confound_name)[confound_items]
-            event = self.__load_csv(event_name)
+                confound = self._load_csv(confound_name)[self.confound_items]
+            event = self._load_csv(event_name)
             subj_results = self.process_subject(img, confound, event, out_prefix)
             for contrast, imgs in subj_results.items():
                 self.to_second_level[contrast].append(imgs["z"])
@@ -331,12 +332,12 @@ class FirstLevelPipe(TaskFmri):
     def fit(self, X, y=None):
         # X is expected to be a tuple containing (imgs, confounds, events)
         # You may need to modify this depending on your specific input structure
-        imgs, confounds, events = X
+        imgs, confounds, confound_items, events = X
 
         self.imgs = imgs
         self.confounds = confounds
         self.events = events
-
+        self.confound_items = confound_items
         self.loop_through_subjects()
 
         return self
@@ -371,7 +372,7 @@ class HigherLevelPipe(TaskFmri):
         contrasts
         out_dir
         stat_maps
-        nonparametric
+        non_parametric
         higher_level_kwargs
         """
         super().__init__(tr, contrasts, out_dir)
@@ -394,7 +395,9 @@ class HigherLevelPipe(TaskFmri):
 
     def process_single_1level_contrast(self, stat_maps, out_prefix):
         if self.nonparametric:
-            second_level_model = non_parametric_inference(**self.model_kwargs)
+            second_level_model = self.loop_through_contrasts_nonparametric(
+                stat_maps, out_prefix
+            )
         else:
             second_level_model = SecondLevelModel(**self.model_kwargs)
             second_level_model = second_level_model.fit(
@@ -423,7 +426,8 @@ class HigherLevelPipe(TaskFmri):
         """
         return_dict = dict()
         if isinstance(self.contrasts, dict):
-            conditions, con_matrix_all = self.contrasts.items()
+            conditions = self.contrasts.keys()
+            con_matrix_all = self.contrasts.values()
         elif isinstance(self.contrasts, list):
             conditions = self.contrasts
             con_matrix_all = [None for i in range(len(conditions))]
@@ -460,7 +464,7 @@ class HigherLevelPipe(TaskFmri):
 
         return return_dict
 
-    def plot_cluster_results(self, results, output_prefix):
+    def plot_cluster_results(self, results: dict, output_prefix):
         threshold = -np.log(0.05)
         vmax = -np.log(1 / self.model_kwargs["n_perm"])
 
