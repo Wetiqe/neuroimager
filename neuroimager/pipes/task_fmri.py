@@ -18,6 +18,7 @@ from nilearn.plotting import plot_design_matrix, plot_contrast_matrix
 from nilearn.plotting import plot_stat_map, view_img_on_surf, plot_glass_brain
 
 
+# TODO: Check the input arguments for better debugging
 class TaskFmri(BaseEstimator, TransformerMixin, object):
     def __init__(self, tr: int, contrasts: list or dict, out_dir: str):
         self.tr = tr
@@ -395,7 +396,7 @@ class HigherLevelPipe(TaskFmri):
 
     def process_single_1level_contrast(self, stat_maps, out_prefix):
         if self.nonparametric:
-            second_level_model = self.loop_through_contrasts_nonparametric(
+            higher_level_results = self.loop_through_contrasts_nonparametric(
                 stat_maps, out_prefix
             )
         else:
