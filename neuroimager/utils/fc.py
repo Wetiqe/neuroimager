@@ -1,9 +1,61 @@
 import numpy as np
 import math
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
+# Part one: sklearn estimator types
+# These are the wrappers for the functions in part two
+class FCFilter(BaseEstimator, TransformerMixin):
+    def __init__(self, network_labels, excludes=None, includes=None):
+        self.network_labels = network_labels
+        self.excludes = excludes
+        self.includes = includes
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return filter_fcs(X, self.network_labels, self.excludes, self.includes)
+
+
+class BipartiteMatrixExtractor(BaseEstimator, TransformerMixin):
+    def __init__(self, network_labels, bp1_labels, bp2_labels):
+        self.network_labels = network_labels
+        self.bp1_labels = bp1_labels
+        self.bp2_labels = bp2_labels
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return extract_bipartite_matrix(X, self.network_labels, self.bp1_labels, self.bp2_labels)
+
+
+class AverageNodesTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, labels):
+        self.labels = labels
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return average_nodes(X, self.labels)
+
+
+class FlattenLowerTriangular(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return flatten_lower_triangular(X)
+
+
+# Part two: functions
 def filter_fcs(
-    fcs: np.array, network_labels: list, excludes: list = None, includes: list = None
+        fcs: np.array, network_labels: list, excludes: list = None, includes: list = None
 ):
     """Filter FC matrix based on network labels
     :param fcs: A numpy matrix shaped (n_subjects, n_nodes, n_nodes) representing the functional connectivity data.
@@ -38,7 +90,7 @@ def filter_fcs(
 
 
 def extract_bipartite_matrix(
-    matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
+        matrix: np.array, network_labels: list, bp1_labels: list, bp2_labels: list
 ):
     """Extract the bipartite part of a functional connectivity matrix.
 
@@ -99,8 +151,8 @@ def average_nodes(fc_matrix, labels):
         for j, other_label in enumerate(unique_labels):
             other_label_indices = np.where(labels == other_label)[0]
             averaged_fc_matrix[:, i, j] = fc_matrix[:, label_indices, :][
-                :, :, other_label_indices
-            ].mean(axis=(1, 2))
+                                          :, :, other_label_indices
+                                          ].mean(axis=(1, 2))
 
     return averaged_fc_matrix.squeeze()
 
