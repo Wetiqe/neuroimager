@@ -165,7 +165,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                 if idx != 0 and save:
                     plt.savefig(
                         os.path.join(
-                            self.out_dir, f"{out_name_prefix}_zmap_{idx % 25 + 1}.png"
+                            self.out_dir, f"{out_name_prefix}_zmaps_{idx % 25 + 1}.png"
                         )
                     )
                     plt.close()
@@ -413,11 +413,12 @@ class HigherLevelPipe(TaskFmri):
     def loop_all_1level_contrasts(self):
         for contrast_1level, stat_maps in tqdm(self.stat_maps.items()):
             tqdm.write(f"Processing contrast {contrast_1level}")
+            self.plot_all_stat(stat_maps, contrast_1level, save=True)
             out_prefix = contrast_1level
             stat_maps = load_imgs(stat_maps)
             group_results = self.process_single_1level_contrast(stat_maps, out_prefix)
             for contrast, imgs in group_results.items():
-                self.higher_results[contrast].append(imgs["z"])
+                self.higher_results[contrast].append(imgs)
 
         return self.higher_results
 
@@ -472,7 +473,7 @@ class HigherLevelPipe(TaskFmri):
         images = []
         titles = []
         for img_name, img in results.items():
-            img.to_filename(f"{output_prefix}_{img_name}.nii.gz")
+            img.to_filename(self.out_dir +f"{output_prefix}_{img_name}.nii.gz")
             if img_name in [
                 "logp_max_t",
                 "logp_max_size",
@@ -506,7 +507,7 @@ class HigherLevelPipe(TaskFmri):
             )
             ax.set_title(titles[img_counter])
         fig.suptitle("Higher level results")
-        fig.savefig(f"{output_prefix}_higher_level_results.png")
+        fig.savefig(self.out_dir + f"{output_prefix}_higher_level_results.png")
         plt.close()
 
     def fit(self, X, y=None):
