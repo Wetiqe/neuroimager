@@ -473,7 +473,7 @@ class HigherLevelPipe(TaskFmri):
         images = []
         titles = []
         for img_name, img in results.items():
-            img.to_filename(self.out_dir +f"{output_prefix}_{img_name}.nii.gz")
+            img.to_filename(self.out_dir + f"{output_prefix}_{img_name}.nii.gz")
             if img_name in [
                 "logp_max_t",
                 "logp_max_size",

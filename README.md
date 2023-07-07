@@ -1,6 +1,51 @@
-# neuroimager
+# Neuroimager
 
-A collection of utilities used for MRI data analysis
+The intetion of this pacakge is to make the crossplatform coding and computing much easier. 
+I am using Linux and the remote HPC systems together and sometimes I may use windows or colab.
+It's not very pleasent to keep things synced. Plus different system may have compatibility issues. 
+Build a package can keep the analysis scripts short and concise.
+
+This package provides some utilities used for MRI data analysis. And some of them also supports SKLearn Pipeline.
+Note this package is mainly warppers of other packages, intended to optimize for neuroimaging analysis 
+(That's why I can this warppers locally). The tools, especially the pipelines are build based on my personal projects,
+so it may not be very general and suits your need. But I will try to make it more general if I am able to do.
+
+![meme](./assets/images/readme1.jpeg)
+
+# A Highly Warpped Pipeline for Task-fMRI analysis
+This is built on top of nilearn pipeline, doing 1st level and 3rd level analysis as defined by FSL.
+Only a few parameters needs to be set, and the pipeline will do the rest. See example scripts for more details.
+```python
+task_pipe = Pipeline(
+    [
+        (
+            "first_level",
+            FirstLevelPipe(
+                tr=TR,
+                contrasts=first_contrasts,
+                out_dir=first_out,
+                prep_func=proc_img,
+                first_level_kwargs=first_level_kwargs,
+            ),
+        ),
+        (
+            "higher_level",
+            HigherLevelPipe(
+                tr=TR,
+                design_matrix=higher_design,
+                contrasts=higher_contrasts,
+                non_parametric=non_parametric,
+                out_dir=higher_out,
+                higher_level_kwargs=second_level_kwargs,
+            ),
+        ),
+    ]
+)
+
+results = task_pipe.fit(
+    (all_img, confounds, confounds_items, events),
+)
+```
 
 # Automatic Analysis of HMM model estimated by HMM-MAR
 ## Get all model selection metrics and generate a HTML report
