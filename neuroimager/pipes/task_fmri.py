@@ -1,7 +1,7 @@
 import csv
 import os
 from tqdm import tqdm
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -396,7 +396,7 @@ class HigherLevelPipe(TaskFmri):
 
     def process_single_1level_contrast(self, stat_maps, out_prefix):
         if self.nonparametric:
-            higher_level_results = self.loop_through_contrasts_nonparametric(
+            higher_level_results = self.loop_all_2level_contrasts_nonparametric(
                 stat_maps, out_prefix
             )
         else:
@@ -405,7 +405,7 @@ class HigherLevelPipe(TaskFmri):
                 stat_maps, design_matrix=self.design_matrix
             )
             del stat_maps
-            higher_level_results = self.loop_through_contrasts(
+            higher_level_results = self.loop_all_2level_contrasts(
                 second_level_model, out_prefix
             )
         return higher_level_results
@@ -422,7 +422,15 @@ class HigherLevelPipe(TaskFmri):
 
         return self.higher_results
 
-    def loop_through_contrasts_nonparametric(self, stat_maps, output_prefix):
+    def loop_all_2level_contrasts(self, fmri_glm, output_prefix):
+        """
+        THIS FUNCTION IS AN ALIAS OF loop_through_contrasts FOR CLARITY
+        """
+        higher_level_results = self.loop_through_contrasts(fmri_glm, output_prefix)
+
+        return higher_level_results
+
+    def loop_all_2level_contrasts_nonparametric(self, stat_maps, output_prefix):
         """
         References: https://nilearn.github.io/dev/modules/generated/nilearn.glm.second_level.non_parametric_inference.html#nilearn.glm.second_level.non_parametric_inference
         """
@@ -451,6 +459,8 @@ class HigherLevelPipe(TaskFmri):
                 )
                 return_dict[condition] = out_dic
                 self.plot_cluster_results(out_dic, output_prefix + "_" + condition)
+                for key, value in out_dic.items():
+                    value.to_filename(f"{output_prefix}_{condition}_{key}.nii.gz")
             else:
                 neg_log10_vfwe_pvals_img = non_parametric_inference(
                     stat_maps,
@@ -506,7 +516,7 @@ class HigherLevelPipe(TaskFmri):
                 axes=ax,
             )
             ax.set_title(titles[img_counter])
-        fig.suptitle("Higher level results")
+        fig.suptitle("Higher level results (Displaying Negative log10 p-values)")
         fig.savefig(self.out_dir + f"{output_prefix}_higher_level_results.png")
         plt.close()
 
