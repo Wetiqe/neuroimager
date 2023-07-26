@@ -5,6 +5,30 @@ import nibabel as nib
 from nilearn.image import index_img
 
 
+def resample_masks(source_img_name, target_img_name, interpolation="continuous"):
+    target_img = load_img(target_img_name)
+    source_img = load_img(source_img_name)
+    res_img = resample_to_img(
+        source_img,
+        target_img,
+        interpolation=interpolation,
+        copy=True,
+        order="F",
+        clip=False,
+        fill_value=0,
+        force_resample=False,
+    )
+
+    if interpolation != "nearest":
+        data = res_img.get_fdata()
+        data_rounded = data.round().astype(int)
+        res_img_rounded = nib.Nifti1Image(data_rounded, res_img.affine, res_img.header)
+
+        return res_img_rounded
+    else:
+        return res_img
+
+
 # TODO: Add support for nilean atlas objects
 def combine_atlases(atlases: list, output_path: str, return_combined_atlas=True):
     """

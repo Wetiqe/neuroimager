@@ -21,6 +21,7 @@ __all__ = [
     "split_schafer_names",
     "combine_atlases",
     "combine_probabilistic_atlases",
+    "resample_masks",
     "filter_rois",
     "flatten_lower_triangular",
     "unflatten_lower_triangular",
