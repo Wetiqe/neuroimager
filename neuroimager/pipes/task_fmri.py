@@ -1,7 +1,7 @@
-import csv
 import os
 from tqdm import tqdm
 from typing import Callable, List
+from neuroimager.utils.rbload import load_csv, load_imgs
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -185,16 +185,6 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
             )
             cidx += 1
 
-    @staticmethod
-    def _load_csv(csv_file):
-        if isinstance(csv_file, str):
-            with open(csv_file, "r") as file:
-                dialect = csv.Sniffer().sniff(file.read(1024))
-                file.seek(0)
-                return pd.read_csv(csv_file, delimiter=dialect.delimiter)
-        elif isinstance(csv_file, pd.DataFrame):
-            return csv_file
-
 
 class FirstLevelPipe(TaskFmri):
     def __init__(
@@ -304,8 +294,8 @@ class FirstLevelPipe(TaskFmri):
             if confound_name is None:
                 confound = None
             else:
-                confound = self._load_csv(confound_name)[self.confound_items]
-            event = self._load_csv(event_name)
+                confound = load_csv(confound_name)[self.confound_items]
+            event = load_csv(event_name)
             subj_results = self.process_subject(img, confound, event, out_prefix)
             for contrast, imgs in subj_results.items():
                 self.to_second_level[contrast].append(imgs["z"])
@@ -531,33 +521,3 @@ class HigherLevelPipe(TaskFmri):
         # Return the `higher_results` attribute here,
         # as it contains the results of the second-level analysis
         return self.higher_results
-
-
-def load_imgs(
-    imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.BIDSImageFile,
-):
-    if isinstance(imgs, str):
-        return nib.load(imgs)
-    elif isinstance(imgs, nib.nifti1.Nifti1Image):
-        return imgs
-    elif isinstance(imgs, bids.layout.models.BIDSImageFile):
-        return imgs.get_image()
-    try:
-        imgs = list(imgs)
-    except TypeError:
-        raise ValueError(
-            "If imgs is not a single file, then imgs must can be converted to list"
-        )
-    try:
-        if isinstance(imgs[0], str):
-            imgs = [nib.load(stat_map) for stat_map in imgs]
-        elif isinstance(imgs[0], bids.layout.models.BIDSImageFile):
-            imgs = [img.get_image() for img in imgs]
-        elif isinstance(imgs[0], nib.nifti1.Nifti1Image):
-            pass
-        else:
-            raise ValueError("imgs must be list of str/nib.Nifti1Image/BIDSImageFile")
-    except IndexError:
-        print("imgs must be non-empty")
-
-    return imgs

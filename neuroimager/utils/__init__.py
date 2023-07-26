@@ -3,6 +3,7 @@ from neuroimager.utils.atlas import (
     combine_atlases,
     combine_probabilistic_atlases,
     filter_rois,
+    resample_masks,
 )
 from neuroimager.utils.fc import (
     flatten_lower_triangular,
@@ -15,6 +16,11 @@ from neuroimager.utils.fc import (
 from neuroimager.utils.ml import (
     evaluate_continuous,
     evaluate_binary,
+)
+
+from neuroimager.utils.rbload import (
+    load_csv,
+    load_imgs,
 )
 
 __all__ = [
@@ -30,4 +36,6 @@ __all__ = [
     "average_nodes",
     "evaluate_continuous",
     "evaluate_binary",
+    "load_csv",
+    "load_imgs",
 ]
