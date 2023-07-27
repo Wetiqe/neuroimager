@@ -6,18 +6,20 @@ from nilearn.image import index_img, load_img, resample_to_img
 from neuroimager.utils.rbload import rbload_imgs
 
 
-def symmetrize_image_data(image_data, round: int or False=False):
+def symmetrize_image_data(image_data, round: int or False = False):
     mid_point = image_data.shape[0] // 2
     left_hemisphere = image_data[:mid_point, :, :]
     right_hemisphere = image_data[mid_point:, :, :]
     right_hemisphere_flipped = np.flip(right_hemisphere, axis=0)
     symmetrized_data = (left_hemisphere + right_hemisphere_flipped) / 2
-    full_symmetrized_data = np.concatenate((symmetrized_data, np.flip(symmetrized_data, axis=0)), axis=0)
+    full_symmetrized_data = np.concatenate(
+        (symmetrized_data, np.flip(symmetrized_data, axis=0)), axis=0
+    )
 
     return full_symmetrized_data
 
 
-def symmetrize_image_nifti(input_file, output_paths:str or list = None):
+def symmetrize_image_nifti(input_file, output_paths: str or list = None):
     """
     Symmetrize a NIfTI image across the mid-sagittal plane.
     Returns a NIfTI image object or a list of NIfTI image objects.
@@ -32,12 +34,16 @@ def symmetrize_image_nifti(input_file, output_paths:str or list = None):
     elif isinstance(output_paths, list):
         save = True
     if len(output_paths) != len(nifti_images):
-        raise ValueError("The number of output paths must match the number of input images.")
+        raise ValueError(
+            "The number of output paths must match the number of input images."
+        )
     symmetrized_nifti_images = []
     for i, nifti_image in enumerate(nifti_images):
         image_data = nifti_image.get_fdata()
         symmetrized_data = symmetrize_image_data(image_data)
-        symmetrized_nifti_image = nib.Nifti1Image(symmetrized_data, nifti_image.affine, nifti_image.header)
+        symmetrized_nifti_image = nib.Nifti1Image(
+            symmetrized_data, nifti_image.affine, nifti_image.header
+        )
         if save:
             nib.save(symmetrized_nifti_image, output_paths[i])
         if len(nifti_images) == 1:
@@ -45,6 +51,7 @@ def symmetrize_image_nifti(input_file, output_paths:str or list = None):
         symmetrized_nifti_images.append(symmetrized_nifti_image)
 
     return symmetrized_nifti_images
+
 
 def resample_masks(source_img_name, target_img_name, interpolation="continuous"):
     target_img = load_img(target_img_name)

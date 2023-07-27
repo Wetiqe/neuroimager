@@ -29,6 +29,9 @@ setup(
         "munkres",
         "scikit-network",
     ],
+    extras_require={
+        "torch": ["torch>=1.0.0"]
+    },
     classifiers=[
         "Development Status :: 1 - Planning",
         "Programming Language :: Python :: 3",
