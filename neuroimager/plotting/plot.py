@@ -21,10 +21,50 @@ def get_sig(sig):
 def density_scatter(
     x, y, reg=True, gaussian_density=True, figsize=(10, 10), display=True, **kwargs
 ):
+    """
+    This function creates a scatter plot with density-based coloring for two input arrays (x and y).
+    The density can be calculated using Gaussian kernel density estimation or by converting a 2D histogram to densities.
+    Optionally, a linear regression line can be added to the plot.
+
+    Parameters:
+    x (array-like): The input data for the x-axis.
+    y (array-like): The input data for the y-axis.
+    reg (bool, optional): If True, adds a linear regression line to the scatter plot. Default is True.
+    gaussian_density (bool, optional): If True, uses Gaussian kernel density estimation to calculate the density.
+        If False, calculates the density from a 2D histogram.
+        Default is True.
+    figsize (tuple, optional): A tuple specifying the width and height of the figure in inches. Default is (10, 10).
+    display (bool, optional): If True, displays the plot. Default is True.
+    **kwargs: Additional keyword arguments to be passed to the matplotlib scatter plot function.
+
+    Returns:
+    fig (matplotlib.figure.Figure): The created Figure object.
+    ax (matplotlib.axes.Axes): The created Axes object containing the scatter plot.
+
+    Examples:
+    x = np.random.randn(100)
+    y = 2 * x + np.random.randn(100)
+    fig, ax = density_scatter(x, y, reg=True, gaussian_density=True, figsize=(8, 8))
+
+    Note:
+    This function requires the following external libraries: NumPy, Matplotlib, and Seaborn.
+    """
     xy = np.vstack([x, y])
     if gaussian_density:
-        z = gaussian_kde(xy)(xy)
-    else:
+        try:
+            from numpy.linalg import LinAlgError
+
+            z = gaussian_kde(xy)(xy)
+        except LinAlgError:
+            import warnings
+
+            warnings.warn(
+                "raised LinAlgError: The covariance matrix associated with the data is singular. "
+                "The density plot will be computed from the histogram"
+            )
+            gaussian_density = False
+
+    if not gaussian_density:
         H, x_edges, y_edges = np.histogram2d(x, y)
         x_centers = (x_edges[:-1] + x_edges[1:]) / 2
         y_centers = (y_edges[:-1] + y_edges[1:]) / 2
@@ -36,7 +76,8 @@ def density_scatter(
     # Create the scatter plot with density-based coloring
     fig, ax = plt.subplots(figsize=figsize)
     sc = ax.scatter(x=x, y=y, c=z, cmap="viridis", **kwargs)
-    sns.regplot(x=x, y=y, scatter=False, ax=ax, color="black")
+    if reg:
+        sns.regplot(x=x, y=y, scatter=False, ax=ax, color="black")
 
     # Add a colorbar to the figure
     cbar = plt.colorbar(sc)
