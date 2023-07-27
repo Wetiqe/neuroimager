@@ -15,16 +15,17 @@ def load_csv(csv_file):
         return csv_file
 
 
-def load_imgs(
+def rbload_imgs(
     imgs: list or str or nib.nifti1.Nifti1Image or bids.layout.models.BIDSImageFile,
 ):
     """
     Load images from a list of paths, a single path, or a list of nibabel images
+    Return a list of nibabel images
     """
     if isinstance(imgs, str):
-        return nib.load(imgs)
+        return [nib.load(imgs)]
     elif isinstance(imgs, nib.nifti1.Nifti1Image):
-        return imgs
+        return [imgs]
     elif isinstance(imgs, bids.layout.models.BIDSImageFile):
         return imgs.get_image()
     try:

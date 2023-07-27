@@ -1,7 +1,7 @@
 import os
 from tqdm import tqdm
 from typing import Callable, List
-from neuroimager.utils.rbload import load_csv, load_imgs
+from neuroimager.utils.rbload import load_csv, rbload_imgs
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -279,7 +279,7 @@ class FirstLevelPipe(TaskFmri):
                 img = img.get_image()
             else:
                 out_prefix = f"sub-{i}"
-                img = load_imgs(img)
+                img = rbload_imgs(img)[0]
             if out_prefixes is not None:
                 out_prefix = out_prefixes[i]
             tqdm.write(f"Processing subject {out_prefix}")
@@ -405,7 +405,7 @@ class HigherLevelPipe(TaskFmri):
             tqdm.write(f"Processing contrast {contrast_1level}")
             self.plot_all_stat(stat_maps, contrast_1level, save=True)
             out_prefix = contrast_1level
-            stat_maps = load_imgs(stat_maps)
+            stat_maps = rbload_imgs(stat_maps)
             group_results = self.process_single_1level_contrast(stat_maps, out_prefix)
             for contrast, imgs in group_results.items():
                 self.higher_results[contrast].append(imgs)
