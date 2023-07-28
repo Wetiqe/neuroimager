@@ -158,17 +158,23 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
         pass
 
     def plot_all_stat(
-        self, list_stat_maps: list, out_name_prefix, plot_kwargs=None, save=True
+        self,
+        list_stat_maps: list,
+        out_name_prefix: str,
+        plot_kwargs: dict = None,
+        save: bool = True,
     ):
+        total_num = len(list_stat_maps) - 1
+        fig, axes, cidx = None, None, None
         for idx, stat_map in enumerate(list_stat_maps):
             if idx % 25 == 0:
                 if idx != 0 and save:
-                    plt.savefig(
+                    fig.savefig(
                         os.path.join(
-                            self.out_dir, f"{out_name_prefix}_zmaps_{idx % 25 + 1}.png"
+                            self.out_dir, f"{out_name_prefix}_zmaps_{idx // 25 + 1}.png"
                         )
                     )
-                    plt.close()
+                    plt.close(fig)
                 fig, axes = plt.subplots(nrows=5, ncols=5, figsize=(25, 25))
                 axes = axes.ravel()
                 cidx = 0
@@ -179,11 +185,20 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                 "plot_abs": False,
                 "display_mode": "z",
             }
-            plot_params.update(plot_kwargs)
+            if plot_kwargs is not None:
+                plot_params.update(plot_kwargs)
             self.plot_single_stat(
-                stat_map, plot="glass", plot_kwargs=plot_kwargs, save=False
+                stat_map, plot="glass", plot_kwargs=plot_params, save=False
             )
             cidx += 1
+
+        if save and cidx > 0:  # Save the last figure if there are unsaved subplots
+            fig.savefig(
+                os.path.join(
+                    self.out_dir, f"{out_name_prefix}_zmaps_{(total_num // 25) + 1}.png"
+                )
+            )
+            plt.close(fig)
 
 
 class FirstLevelPipe(TaskFmri):
