@@ -19,7 +19,7 @@ from neuroimager.utils.ml import (
 )
 
 from neuroimager.utils.rbload import (
-    load_csv,
+    rbload_csv,
     rbload_imgs,
 )
 
@@ -36,6 +36,6 @@ __all__ = [
     "average_nodes",
     "evaluate_continuous",
     "evaluate_binary",
-    "load_csv",
+    "rbload_csv",
     "rbload_imgs",
 ]

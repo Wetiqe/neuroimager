@@ -1,7 +1,7 @@
 import os
 from tqdm import tqdm
 from typing import Callable, List
-from neuroimager.utils.rbload import load_csv, rbload_imgs
+from neuroimager.utils.rbload import rbload_csv, rbload_imgs
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -58,7 +58,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                     "Only supports the plotting of contrast matrix"
                 )
 
-    def loop_through_contrasts(self, fmri_glm, output_prefix):
+    def loop_all_contrasts(self, fmri_glm, output_prefix):
         return_dict = dict()
         if isinstance(self.contrasts, dict):
             conditions = self.contrasts.keys()
@@ -232,7 +232,7 @@ class FirstLevelPipe(TaskFmri):
         else:
             raise ValueError("Contrasts must be either dict or list")
 
-    def process_subject(
+    def process_single_subject(
         self,
         img: nib.nifti1.Nifti1Image,
         confound: pd.DataFrame,
@@ -251,11 +251,11 @@ class FirstLevelPipe(TaskFmri):
         else:
             print(f"Design matrix for {out_prefix} is {design_validity}")
         del img  # release the memory
-        subj_results = self.loop_through_contrasts(fmri_glm, out_prefix)
+        subj_results = self.loop_all_contrasts(fmri_glm, out_prefix)
 
         return subj_results
 
-    def loop_through_subjects(
+    def loop_all_subjects(
         self,
         out_prefixes: List[str] = None,
     ):
@@ -294,9 +294,9 @@ class FirstLevelPipe(TaskFmri):
             if confound_name is None:
                 confound = None
             else:
-                confound = load_csv(confound_name)[self.confound_items]
-            event = load_csv(event_name)
-            subj_results = self.process_subject(img, confound, event, out_prefix)
+                confound = rbload_csv(confound_name)[self.confound_items]
+            event = rbload_csv(event_name)
+            subj_results = self.process_single_subject(img, confound, event, out_prefix)
             for contrast, imgs in subj_results.items():
                 self.to_second_level[contrast].append(imgs["z"])
             i += 1
@@ -329,7 +329,7 @@ class FirstLevelPipe(TaskFmri):
         self.confounds = confounds
         self.events = events
         self.confound_items = confound_items
-        self.loop_through_subjects()
+        self.loop_all_subjects()
 
         return self
 
@@ -416,7 +416,7 @@ class HigherLevelPipe(TaskFmri):
         """
         THIS FUNCTION IS AN ALIAS OF loop_through_contrasts FOR CLARITY
         """
-        higher_level_results = self.loop_through_contrasts(fmri_glm, output_prefix)
+        higher_level_results = self.loop_all_contrasts(fmri_glm, output_prefix)
 
         return higher_level_results
 

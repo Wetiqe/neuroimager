@@ -5,7 +5,7 @@ import nibabel as nib
 import bids
 
 
-def load_csv(csv_file):
+def rbload_csv(csv_file):
     if isinstance(csv_file, str):
         with open(csv_file, "r") as file:
             dialect = csv.Sniffer().sniff(file.read(1024))
