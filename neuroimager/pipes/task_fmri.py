@@ -1,11 +1,12 @@
 import os
 from tqdm import tqdm
-from typing import Callable, List
+from typing import Callable, List, Dict
 from neuroimager.utils.rbload import rbload_csv, rbload_imgs
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from numpy import ndarray
 
 from sklearn.base import BaseEstimator, TransformerMixin
 import nibabel as nib
@@ -22,10 +23,17 @@ from nilearn.reporting import get_clusters_table
 
 # TODO: Check the input arguments for better debugging
 class TaskFmri(BaseEstimator, TransformerMixin, object):
-    def __init__(self, tr: int, contrasts: list or dict, out_dir: str):
+    def __init__(
+        self,
+        tr: int,
+        contrasts: list or dict,
+        out_dir: str,
+        generate_report: bool = False,
+    ):
         self.tr = tr
         self.contrasts = contrasts
         self.out_dir = out_dir
+        self.generate_report = generate_report
 
     def plot_design_matrix(self, design_matrix, prefix="", out_dir=None):
         if out_dir is None:
@@ -99,6 +107,37 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
 
         return return_dict
 
+    def generate_nilearn_report(
+        self,
+        fitted_glm: FirstLevelModel or SecondLevelModel,
+        contrasts: Dict[str, ndarray] or str or List[str] or ndarray or List[ndarray],
+        title=None,
+        bg_img="MNI152TEMPLATE",
+        threshold=1.96,
+        alpha=0.05,
+        cluster_threshold=10,
+        height_control="fpr",
+        min_distance=8.0,
+        plot_type="glass",
+        display_mode="lyrz",
+        report_dims=(1600, 800),
+    ):
+        html = fitted_glm.generate_report(
+            contrasts,
+            title=title,
+            bg_img=bg_img,
+            threshold=threshold,
+            alpha=alpha,
+            cluster_threshold=cluster_threshold,
+            height_control=height_control,
+            min_distance=min_distance,
+            plot_type=plot_type,
+            display_mode=display_mode,
+            report_dims=report_dims,
+        )
+        with open(self.out_dir + f"{title}report.html", "w") as f:
+            f.write(html)
+
     def plot_single_stat(
         self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
     ):
@@ -162,13 +201,14 @@ class FirstLevelPipe(TaskFmri):
         confound_items: List[str] = None,
         events: List[str or pd.DataFrame] = None,
         prep_func: str or Callable or None = None,
+        generate_report: bool = False,
         first_level_kwargs: dict = None,
     ):
         """
 
         Note: The imgs, confounds, events can be empty here, in that case they must be specified in the fit method.
         """
-        super().__init__(tr, contrasts, out_dir)
+        super().__init__(tr, contrasts, out_dir, generate_report)
         self.out_dir = out_dir
         os.makedirs(self.out_dir, exist_ok=True)
         self.tr = tr
@@ -206,9 +246,13 @@ class FirstLevelPipe(TaskFmri):
         plot_design: bool = True,
     ):
         event = event[["trial_type", "onset", "duration"]]
-        fmri_glm = FirstLevelModel(**self.first_level_kwargs)
-        fmri_glm = fmri_glm.fit(img, events=event, confounds=confound)  # fit the model
-        design_matrix = fmri_glm.design_matrices_[0]
+        first_level_model = FirstLevelModel(**self.first_level_kwargs)
+        first_level_model = first_level_model.fit(
+            img, events=event, confounds=confound
+        )  # fit the model
+        if self.generate_report:
+            self.generate_nilearn_report(first_level_model, self.contrasts, out_prefix)
+        design_matrix = first_level_model.design_matrices_[0]
         design_validity = self.__check_design(design_matrix)
         if design_validity == "valid":
             if plot_design:
@@ -216,7 +260,7 @@ class FirstLevelPipe(TaskFmri):
         else:
             print(f"Design matrix for {out_prefix} is {design_validity}")
         del img  # release the memory
-        subj_results = self.loop_all_contrasts_parametric(fmri_glm, out_prefix)
+        subj_results = self.loop_all_contrasts_parametric(first_level_model, out_prefix)
 
         return subj_results
 
@@ -313,6 +357,7 @@ class HigherLevelPipe(TaskFmri):
         out_dir: str,
         stat_maps: dict = None,
         non_parametric: bool = False,
+        generate_report: bool = True,
         stat_map_masks: list or dict = None,
         higher_level_kwargs: dict = None,
     ):
@@ -332,7 +377,7 @@ class HigherLevelPipe(TaskFmri):
         non_parametric
         higher_level_kwargs
         """
-        super().__init__(tr, contrasts, out_dir)
+        super().__init__(tr, contrasts, out_dir, generate_report)
         self.out_dir = out_dir
         os.makedirs(self.out_dir, exist_ok=True)
         self.stat_maps = stat_maps
@@ -361,6 +406,10 @@ class HigherLevelPipe(TaskFmri):
             second_level_model = second_level_model.fit(
                 stat_maps, design_matrix=self.design_matrix
             )
+            if self.generate_report:
+                self.generate_nilearn_report(
+                    second_level_model, self.contrasts, out_prefix
+                )
             del stat_maps
             higher_level_result = self.loop_all_2level_contrasts_parametric(
                 second_level_model, out_prefix
@@ -501,7 +550,7 @@ class HigherLevelPipe(TaskFmri):
         mask_img=None,
         alphas: float or List[float] = None,
         threshold: float = 1.96,
-        cluster_threshold: float = 0,
+        cluster_threshold: float = 10,
         two_sided: bool = True,
         save: bool = True,
         prefix: str = None,
@@ -574,7 +623,7 @@ class HigherLevelPipe(TaskFmri):
                         + f"{prefix}_{img_name}_threshed_zstat_alpha{alpha}.nii.gz"
                     )
                 if img_name == "None":
-                    to_plot_tmp["No Correction Applied"] = thresholded_map
+                    to_plot_tmp[f"Z value threshold {threshold} "] = thresholded_map
                 elif img_name == "fpr":
                     to_plot_tmp["False Positive Rate (FPR) Corrected"] = thresholded_map
                 elif img_name == "fdr":
@@ -666,7 +715,6 @@ class HigherLevelPipe(TaskFmri):
         plot_kwargs: dict = None,
         save: bool = True,
     ):
-        total_num = len(list_stat_maps) - 1
         fig, axes, cidx = None, None, None
         for idx, stat_map in enumerate(list_stat_maps):
             if idx % 25 == 0:
