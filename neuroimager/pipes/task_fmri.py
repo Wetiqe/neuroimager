@@ -197,6 +197,7 @@ class FirstLevelPipe(TaskFmri):
         contrasts: List[str] or dict,
         out_dir: str,
         imgs: List[bids.layout.models.BIDSImageFile] = None,
+        subj_ids: List[str] = None,
         confounds: List[str or pd.DataFrame] = None,
         confound_items: List[str] = None,
         events: List[str or pd.DataFrame] = None,
@@ -210,11 +211,13 @@ class FirstLevelPipe(TaskFmri):
         """
         super().__init__(tr, contrasts, out_dir, generate_report)
         self.out_dir = out_dir
-        os.makedirs(self.out_dir, exist_ok=True)
         self.tr = tr
         self.imgs = imgs
+        self.subj_ids = subj_ids
         self.confounds = confounds
+        self.confound_items = confound_items
         self.events = events
+        self.prep_func = prep_func
         self.first_level_kwargs = {
             "t_r": self.tr,
             "noise_model": "ar1",
@@ -224,15 +227,37 @@ class FirstLevelPipe(TaskFmri):
             "signal_scaling": False,
             "minimize_memory": True,
         }
-        self.prep_func = prep_func
-        self.confound_items = confound_items
         self.first_level_kwargs.update(first_level_kwargs)
         self.to_second_level = {}
-        if isinstance(contrasts, dict):
-            for key, value in contrasts.items():
+        self.__prep_input()
+
+    def __prep_input(self):
+        os.makedirs(self.out_dir, exist_ok=True)
+        if self.imgs is not None:
+            if self.subj_ids is not None:
+                if len(self.imgs) != len(self.subj_ids):
+                    raise ValueError(
+                        "The number of images and subject ids must be equal"
+                    )
+            if confounds is None:
+                self.confounds = [None] * len(imgs)
+        if self.confounds is not None:
+            if self.confound_items is None:
+                self.confound_items = [
+                    "white_matter",
+                    "framewise_displacement",
+                    "trans_x",
+                    "trans_y",
+                    "trans_z",
+                    "rot_x",
+                    "rot_y",
+                    "rot_z",
+                ]
+        if isinstance(self.contrasts, dict):
+            for key, value in self.contrasts.items():
                 self.to_second_level[key] = []
-        elif isinstance(contrasts, list):
-            for contrast in contrasts:
+        elif isinstance(self.contrasts, list):
+            for contrast in self.contrasts:
                 self.to_second_level[contrast] = []
         else:
             raise ValueError("Contrasts must be either dict or list")
@@ -268,17 +293,19 @@ class FirstLevelPipe(TaskFmri):
         self,
         out_prefixes: List[str] = None,
     ):
-        if self.confound_items is None:
-            self.confound_items = [
-                "white_matter",
-                "framewise_displacement",
-                "trans_x",
-                "trans_y",
-                "trans_z",
-                "rot_x",
-                "rot_y",
-                "rot_z",
-            ]
+        """
+        Conduct first level analysis for all subjects
+        Parameters
+        ----------
+        out_prefixes: List[str] By default, the subject id is used as the prefix for the output files.
+            If the input images are not bids, then the prefix is sub-0, sub-1, etc. Or it will be the subject id if specified.
+            If out_prefixes is specified, then it will be used as the prefix for the output files.
+            out_prefixes > self.subj_ids > img.get_entities()["subject"] > sub-0, sub-1, etc.
+
+        Returns
+        -------
+
+        """
         i = 0
         for img, confound_name, event_name in tqdm(
             zip(self.imgs, self.confounds, self.events)
@@ -289,6 +316,8 @@ class FirstLevelPipe(TaskFmri):
             else:
                 out_prefix = f"sub-{i}"
                 img = rbload_imgs(img)[0]
+            if self.subj_ids is not None:
+                out_prefix = self.subj_ids[i]
             if out_prefixes is not None:
                 out_prefix = out_prefixes[i]
             tqdm.write(f"Processing subject {out_prefix}")
@@ -330,14 +359,25 @@ class FirstLevelPipe(TaskFmri):
         return "valid"
 
     def fit(self, X, y=None):
-        # X is expected to be a tuple containing (imgs, confounds, events)
+        """
+        Parameters
+        ----------
+        X: X is expected to be a tuple containing (imgs, confounds,confound_items, events)
+            confound_items is meaningful only if confounds is not None
+        y: For consistency with scikit-learn API
+
+        Returns
+        -------
+        self
+        """
         # You may need to modify this depending on your specific input structure
         imgs, confounds, confound_items, events = X
 
         self.imgs = imgs
-        self.confounds = confounds
         self.events = events
         self.confound_items = confound_items
+        self.confounds = confounds
+        self.__prep_input()
         self.loop_all_subjects()
 
         return self
@@ -379,22 +419,25 @@ class HigherLevelPipe(TaskFmri):
         """
         super().__init__(tr, contrasts, out_dir, generate_report)
         self.out_dir = out_dir
-        os.makedirs(self.out_dir, exist_ok=True)
         self.stat_maps = stat_maps
         self.design_matrix = design_matrix
         self.higher_results = {}
-        if isinstance(contrasts, dict):
-            for key, value in contrasts.items():
-                self.higher_results[key] = []
-        elif isinstance(contrasts, list):
-            for contrast in contrasts:
-                self.higher_results[contrast] = []
-        else:
-            raise ValueError("Contrasts must be either dict or list")
         self.nonparametric = non_parametric
         self.stat_map_masks = stat_map_masks
         self.model_kwargs = {}
         self.model_kwargs.update(higher_level_kwargs)
+        self.__prep_input()
+
+    def __prep_input(self):
+        os.makedirs(self.out_dir, exist_ok=True)
+        if isinstance(self.contrasts, dict):
+            for key, value in self.contrasts.items():
+                self.higher_results[key] = []
+        elif isinstance(self.contrasts, list):
+            for contrast in self.contrasts:
+                self.higher_results[contrast] = []
+        else:
+            raise ValueError("Contrasts must be either dict or list")
 
     def process_single_1level_contrast(self, stat_maps, out_prefix, plot=True):
         if self.nonparametric:
