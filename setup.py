@@ -28,6 +28,8 @@ setup(
         "networkx",
         "munkres",
         "scikit-network",
+        "pybids",
+        "tqdm"
     ],
     extras_require={"torch": ["torch>=1.0.0"]},
     classifiers=[

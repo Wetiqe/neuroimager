@@ -239,8 +239,8 @@ class FirstLevelPipe(TaskFmri):
                     raise ValueError(
                         "The number of images and subject ids must be equal"
                     )
-            if confounds is None:
-                self.confounds = [None] * len(imgs)
+            if self.confounds is None:
+                self.confounds = [None] * len(self.imgs)
         if self.confounds is not None:
             if self.confound_items is None:
                 self.confound_items = [
