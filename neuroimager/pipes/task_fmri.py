@@ -13,9 +13,11 @@ import bids.layout.models
 
 from nilearn.glm.first_level import FirstLevelModel, check_design_matrix
 from nilearn.glm.second_level import SecondLevelModel, non_parametric_inference
+from nilearn.glm import threshold_stats_img
 from nilearn.image import clean_img
 from nilearn.plotting import plot_design_matrix, plot_contrast_matrix
 from nilearn.plotting import plot_stat_map, view_img_on_surf, plot_glass_brain
+from nilearn.reporting import get_clusters_table
 
 
 # TODO: Check the input arguments for better debugging
@@ -58,7 +60,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
                     "Only supports the plotting of contrast matrix"
                 )
 
-    def loop_all_contrasts(self, fmri_glm, output_prefix):
+    def loop_all_contrasts_parametric(self, fmri_glm, output_prefix):
         return_dict = dict()
         if isinstance(self.contrasts, dict):
             conditions = self.contrasts.keys()
@@ -148,58 +150,6 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
             # )
         plt.close()
 
-    # TODO: Add thresholding
-    def thresh_stat(
-        self,
-    ):
-        pass
-
-    def get_tables(self):
-        pass
-
-    def plot_all_stat(
-        self,
-        list_stat_maps: list,
-        out_name_prefix: str,
-        plot_kwargs: dict = None,
-        save: bool = True,
-    ):
-        total_num = len(list_stat_maps) - 1
-        fig, axes, cidx = None, None, None
-        for idx, stat_map in enumerate(list_stat_maps):
-            if idx % 25 == 0:
-                if idx != 0 and save:
-                    fig.savefig(
-                        os.path.join(
-                            self.out_dir, f"{out_name_prefix}_zmaps_{idx // 25 + 1}.png"
-                        )
-                    )
-                    plt.close(fig)
-                fig, axes = plt.subplots(nrows=5, ncols=5, figsize=(25, 25))
-                axes = axes.ravel()
-                cidx = 0
-
-            plot_params = {
-                "title": os.path.basename(stat_map),
-                "axes": axes[cidx],
-                "plot_abs": False,
-                "display_mode": "z",
-            }
-            if plot_kwargs is not None:
-                plot_params.update(plot_kwargs)
-            self.plot_single_stat(
-                stat_map, plot="glass", plot_kwargs=plot_params, save=False
-            )
-            cidx += 1
-
-        if save and cidx > 0:  # Save the last figure if there are unsaved subplots
-            fig.savefig(
-                os.path.join(
-                    self.out_dir, f"{out_name_prefix}_zmaps_{(total_num // 25) + 1}.png"
-                )
-            )
-            plt.close(fig)
-
 
 class FirstLevelPipe(TaskFmri):
     def __init__(
@@ -266,7 +216,7 @@ class FirstLevelPipe(TaskFmri):
         else:
             print(f"Design matrix for {out_prefix} is {design_validity}")
         del img  # release the memory
-        subj_results = self.loop_all_contrasts(fmri_glm, out_prefix)
+        subj_results = self.loop_all_contrasts_parametric(fmri_glm, out_prefix)
 
         return subj_results
 
@@ -363,6 +313,7 @@ class HigherLevelPipe(TaskFmri):
         out_dir: str,
         stat_maps: dict = None,
         non_parametric: bool = False,
+        stat_map_masks: list or dict = None,
         higher_level_kwargs: dict = None,
     ):
         """
@@ -396,12 +347,13 @@ class HigherLevelPipe(TaskFmri):
         else:
             raise ValueError("Contrasts must be either dict or list")
         self.nonparametric = non_parametric
+        self.stat_map_masks = stat_map_masks
         self.model_kwargs = {}
         self.model_kwargs.update(higher_level_kwargs)
 
-    def process_single_1level_contrast(self, stat_maps, out_prefix):
+    def process_single_1level_contrast(self, stat_maps, out_prefix, plot=True):
         if self.nonparametric:
-            higher_level_results = self.loop_all_2level_contrasts_nonparametric(
+            higher_level_result = self.loop_all_2level_contrasts_nonparametric(
                 stat_maps, out_prefix
             )
         else:
@@ -410,10 +362,70 @@ class HigherLevelPipe(TaskFmri):
                 stat_maps, design_matrix=self.design_matrix
             )
             del stat_maps
-            higher_level_results = self.loop_all_2level_contrasts(
+            higher_level_result = self.loop_all_2level_contrasts_parametric(
                 second_level_model, out_prefix
             )
-        return higher_level_results
+        if plot:
+            self.plot_higher_level_result(higher_level_result, out_prefix)
+
+        return higher_level_result
+
+    def plot_higher_level_result(self, higher_level_result, out_prefix):
+        # TODO: Update docstrings.
+        # TODO: add **kwargs support for all plotting functions
+        for contrast_1level, returned_dict in higher_level_result.items():
+            if self.nonparametric:
+                if isinstance(returned_dict, dict):
+                    self.plot_cluster_nonparametric(
+                        returned_dict, out_prefix + "_" + contrast_1level
+                    )
+                else:
+                    img = returned_dict
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    plot_glass_brain(
+                        img,
+                        colorbar=True,
+                        display_mode="ortho",
+                        plot_abs=False,
+                        figure=fig,
+                        axes=ax,
+                    )
+                    fig.suptitle(
+                        "Higher level nonparametric results (Displaying FWER-corrected Negative log10 p-values)"
+                    )
+                    # TODO: save the fig to proper location
+                    # fig.savefig()
+            else:
+                if self.stat_map_masks is None:
+                    masks = [None]
+                    masks_names = [None]
+                elif isinstance(self.stat_map_masks, list):
+                    masks = self.stat_map_masks
+                    masks_names = [f"mask{i+1}" for i in range(len(masks))]
+                elif isinstance(self.stat_map_masks, dict):
+                    masks = list(self.stat_map_masks.values())
+                    masks_names = list(self.stat_map_masks.keys())
+                else:
+                    raise TypeError("stat")
+
+                for mask, mask_name in zip(masks, masks_names):
+                    if masks_names[0] is None:
+                        plot_prefix = out_prefix + "_" + contrast_1level
+                    else:
+                        plot_prefix = (
+                            out_prefix + "_" + contrast_1level + "_" + mask_name
+                        )
+                    mask = rbload_imgs(mask)[0]
+                    self.plot_cluster_parametric(
+                        returned_dict["z"],
+                        mask_img=mask,
+                        alphas=[0.05, 0.01, 0.001],
+                        threshold=1.645,
+                        cluster_threshold=0,
+                        two_sided=True,
+                        save=True,
+                        prefix=plot_prefix,
+                    )
 
     def loop_all_1level_contrasts(self):
         for contrast_1level, stat_maps in tqdm(self.stat_maps.items()):
@@ -427,13 +439,15 @@ class HigherLevelPipe(TaskFmri):
 
         return self.higher_results
 
-    def loop_all_2level_contrasts(self, fmri_glm, output_prefix):
+    def loop_all_2level_contrasts_parametric(self, fmri_glm, output_prefix):
         """
         THIS FUNCTION IS AN ALIAS OF loop_through_contrasts FOR CLARITY
         """
-        higher_level_results = self.loop_all_contrasts(fmri_glm, output_prefix)
+        higher_level_result = self.loop_all_contrasts_parametric(
+            fmri_glm, output_prefix
+        )
 
-        return higher_level_results
+        return higher_level_result
 
     def loop_all_2level_contrasts_nonparametric(self, stat_maps, output_prefix):
         """
@@ -463,7 +477,7 @@ class HigherLevelPipe(TaskFmri):
                     **self.model_kwargs,
                 )
                 return_dict[condition] = out_dic
-                self.plot_cluster_results(out_dic, output_prefix + "_" + condition)
+                # self.plot_cluster_nonparametric(out_dic, output_prefix + "_" + condition)
                 for key, value in out_dic.items():
                     value.to_filename(f"{output_prefix}_{condition}_{key}.nii.gz")
             else:
@@ -481,7 +495,123 @@ class HigherLevelPipe(TaskFmri):
 
         return return_dict
 
-    def plot_cluster_results(self, results: dict, output_prefix):
+    def plot_cluster_parametric(
+        self,
+        stat_img,
+        mask_img=None,
+        alphas: float or List[float] = None,
+        threshold: float = 1.96,
+        cluster_threshold: float = 0,
+        two_sided: bool = True,
+        save: bool = True,
+        prefix: str = None,
+    ):
+        """
+        Technically this function is exactly same as nilearn.glm.threshold_stats_img.
+        This function loops all provided method (None|’fpr’|’fdr’|’bonferroni’) and different alpha level (0.05,0.01,0.001), then save a figure for convenience.
+
+        Parameters
+        ----------
+        stat_img: Niimg-like object or None, optional
+        Statistical image (presumably in z scale) whenever height_control is ‘fpr’ or None, stat_img=None is acceptable. If it is ‘fdr’ or ‘bonferroni’, an error is raised if stat_img is None.
+
+        mask_img: Niimg-like object, optional,
+        Mask image
+
+        alphas : float or list, optional
+        Number controlling the thresholding (either a p-value or q-value). Its actual meaning depends on the height_control parameter. This function translates alpha to a z-scale threshold. Default=0.001.
+
+        threshold: float, optional
+        Desired threshold in z-scale. This is used only if height_control is None. Default=3.0.
+
+        cluster_threshold: float, optional
+        cluster size threshold. In the returned thresholded map, sets of connected voxels (clusters) with size smaller than this number will be removed. Default=0.
+
+        two_sided: Bool, optional
+        Whether the thresholding should yield both positive and negative part of the maps. In that case, alpha is corrected by a factor of 2. Default=True.
+
+        save:bool, optional
+        If True, save all thresholded images to nii objects.
+
+        prefix: str, optional
+        Prefix for the outputfile. If save is True, prefix must be specified.
+
+        Returns
+        threshed_imgs_dict
+        -------
+
+        """
+        if save:
+            if not prefix:
+                raise ValueError("If save is True, prefix must be specified.")
+        threshed_imgs_dict = {}
+        if isinstance(alphas, float):
+            alphas = [alphas]
+        elif alphas is None:
+            alphas = [0.05, 0.01, 0.001]
+        try:
+            alphas = list(alphas)
+        except:
+            raise TypeError("alpha must be iterable if you didn't pass a single value")
+        for alpha in alphas:
+            threshed_imgs_dict[f"{alpha}"] = {}
+            to_plot_tmp = {}
+            for method in [None, "fpr", "fdr", "bonferroni"]:
+                thresholded_map, threshold = threshold_stats_img(
+                    stat_img=stat_img,
+                    mask_img=mask_img,
+                    alpha=alpha,
+                    threshold=threshold,
+                    height_control=method,
+                    cluster_threshold=cluster_threshold,
+                    two_sided=two_sided,
+                )
+                img_name = "None" if method is None else method
+                threshed_imgs_dict[f"{alpha}"][img_name] = thresholded_map
+                if save:
+                    thresholded_map.to_filename(
+                        self.out_dir
+                        + f"{prefix}_{img_name}_threshed_zstat_alpha{alpha}.nii.gz"
+                    )
+                if img_name == "None":
+                    to_plot_tmp["No Correction Applied"] = thresholded_map
+                elif img_name == "fpr":
+                    to_plot_tmp["False Positive Rate (FPR) Corrected"] = thresholded_map
+                elif img_name == "fdr":
+                    to_plot_tmp[
+                        "False Discovery Rate (FDR) Corrected"
+                    ] = thresholded_map
+                elif img_name == "bonferroni":
+                    to_plot_tmp["Bonferroni Corrected"] = thresholded_map
+
+            fig, axes = plt.subplots(figsize=(8, 8), nrows=2, ncols=2)
+            axes = axes.ravel()
+            for img_counter, (title, img) in enumerate(to_plot_tmp.items()):
+                if img_counter >= len(to_plot_tmp.keys()):
+                    break
+                ax = axes[img_counter]
+                plot_glass_brain(
+                    img,
+                    colorbar=True,
+                    display_mode="z",
+                    plot_abs=False,
+                    threshold=0,
+                    figure=fig,
+                    axes=ax,
+                )
+                ax.set_title(title)
+            fig.suptitle(
+                "Higher level parametric results (Displaying Thresholded Z-scaled statistics )"
+            )
+            fig.savefig(
+                self.out_dir
+                + f"{prefix}_higher_level_parametric_results_alpha{alpha}.png"
+            )
+            plt.close()
+
+        return threshed_imgs_dict
+
+    def plot_cluster_nonparametric(self, results: dict, output_prefix):
         threshold = -np.log(0.05)
         vmax = -np.log(1 / self.model_kwargs["n_perm"])
 
@@ -521,9 +651,57 @@ class HigherLevelPipe(TaskFmri):
                 axes=ax,
             )
             ax.set_title(titles[img_counter])
-        fig.suptitle("Higher level results (Displaying Negative log10 p-values)")
-        fig.savefig(self.out_dir + f"{output_prefix}_higher_level_results.png")
+        fig.suptitle(
+            "Higher level nonparametric results (Displaying Negative log10 p-values)"
+        )
+        fig.savefig(
+            self.out_dir + f"{output_prefix}_higher_level_nonparametric_results.png"
+        )
         plt.close()
+
+    def plot_all_stat(
+        self,
+        list_stat_maps: list,
+        out_name_prefix: str,
+        plot_kwargs: dict = None,
+        save: bool = True,
+    ):
+        total_num = len(list_stat_maps) - 1
+        fig, axes, cidx = None, None, None
+        for idx, stat_map in enumerate(list_stat_maps):
+            if idx % 25 == 0:
+                if idx != 0 and save:
+                    fig.savefig(
+                        os.path.join(
+                            self.out_dir, f"{out_name_prefix}_zmaps_{idx // 25}.png"
+                        )
+                    )
+                    plt.close(fig)
+                fig, axes = plt.subplots(nrows=5, ncols=5, figsize=(25, 25))
+                axes = axes.ravel()
+                cidx = 0
+
+            plot_params = {
+                "title": os.path.basename(stat_map),
+                "axes": axes[cidx],
+                "threshold": 1.96,
+                "plot_abs": False,
+                "display_mode": "z",
+            }
+            if plot_kwargs is not None:
+                plot_params.update(plot_kwargs)
+            self.plot_single_stat(
+                stat_map, plot="glass", plot_kwargs=plot_params, save=False
+            )
+            cidx += 1
+
+        if save and cidx > 0:  # Save the last figure if there are unsaved subplots
+            fig.savefig(
+                os.path.join(
+                    self.out_dir, f"{out_name_prefix}_zmaps_{int((idx // 25) + 1)}.png"
+                )
+            )
+            plt.close(fig)
 
     def fit(self, X, y=None):
         # X is expected to be a dictionary containing {contrast: [stat_maps]}
