@@ -8,7 +8,7 @@ with open(os.path.join(current_dir, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="neuroimager",
-    version="0.0.8",
+    version="0.0.9",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
@@ -29,7 +29,7 @@ setup(
         "munkres",
         "scikit-network",
         "pybids",
-        "tqdm"
+        "tqdm",
     ],
     extras_require={"torch": ["torch>=1.0.0"]},
     classifiers=[

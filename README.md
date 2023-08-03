@@ -10,9 +10,26 @@ Note this package is mainly warppers of other packages, intended to optimize for
 (That's why I can this warppers locally). The tools, especially the pipelines are build based on my personal projects,
 so it may not be very general and suits your need. But I will try to make it more general if I am able to do.
 
+# NOTE!!! This package is still under development and heavily tested, expected to be unstable when used in your analysis.
+# Aims
+This package aims to make 'standard' neuroimaging analysis more easier. 
+In most cases, it is not suitable for developing new analysis pipeline, but some handy small functions may 
+still be helpful to you. Such as atalas operation, permutation based statistics, matrix transformation etc.
+
+## Main Functions
+* Build warpper classes for some common analysis used in MRI analysis (Actually, in my own analysis)
+* Permutation based statistics for neuroimaging
+* Matrix data ML preprocessing and analysis 
+* Nice plotting functions 
+## Styles
+* Preprocess and analyze data using SKLearn transformer style API (Ideally)
+* Statistical analysis aims to be pingouin style
+* Plotting aims to be seaborn style
+
 ![meme](./assets/images/readme1.jpeg)
 
-# A Highly Warpped Pipeline for Task-fMRI analysis
+# Gallery
+## A Highly Warpped Pipeline for Task-fMRI analysis
 This is built on top of nilearn pipeline, doing 1st level and 3rd level analysis as defined by FSL.
 Only a few parameters needs to be set, and the pipeline will do the rest. See example scripts for more details.
 ```python
@@ -47,8 +64,8 @@ results = task_pipe.fit(
 )
 ```
 
-# Automatic Analysis of HMM model estimated by HMM-MAR
-## Get all model selection metrics and generate a HTML report
+## Automatic Analysis of HMM model estimated by HMM-MAR
+### Get all model selection metrics and generate a HTML report
 
 ```python
 from neuroimager.pipes.hmm import HmmModelSelector
@@ -64,7 +81,7 @@ selector = HmmModelSelector(
 selector.auto_parse()
 ```
 
-## Get the features of the selected models
+### Get the features of the selected models
 
 ```python
 from neuroimager.pipes.hmm import HmmParser
@@ -83,7 +100,7 @@ hmm.generate_report(threshold=0.15, plot_vpath=True)
 print(hmm.chronnectome)
 ```
 
-# Atlas Operation
+## Atlas Operation
 
 Suggest you have two probability atlas:
 
@@ -111,7 +128,7 @@ for file in atlas_paths:
 
 Then you can use the atlas_operation to do some operations on the atlases:
 
-## Remove selected regions
+### Remove selected regions
 ```python
 from neuroimager.utils import filter_rois
 from nilearn import plotting
@@ -126,7 +143,7 @@ plotting.show()
 
 ![filtered_harvard](./assets/images/subregions.png)
 
-## Merge two atlases
+### Merge two atlases
 
 ```python
 from neuroimager.utils import combine_probabilistic_atlases
