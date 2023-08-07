@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, TransformerMixin
 import seaborn as sns
 from matplotlib import pyplot as plt
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr, kendalltau
 from neuroimager.plotting import density_scatter
 
 
@@ -20,9 +20,7 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         pca_y: bool = False,
         pca_x_kwargs: Optional[Dict] = None,
         pca_y_kwargs: Optional[Dict] = None,
-        correlation_measure: Union[
-            str, Callable
-        ] = "pearson",  # TODO: implement callable
+        corr_method: str = "pearson",
         random_state: Optional[int] = 42,
     ) -> None:
         """
@@ -42,7 +40,13 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         default_pca_kwargs = {"n_components": 0.95, "whiten": True}
         self.pca_x_kwargs = pca_x_kwargs if pca_x_kwargs else default_pca_kwargs
         self.pca_y_kwargs = pca_y_kwargs if pca_y_kwargs else default_pca_kwargs
-        self.corr = correlation_measure
+        self.corr_method = corr_method
+        self.cca_model = None
+        self.X_c_ = None
+        self.Y_c_ = None
+        self.orig_rs_ = None
+        self.X_loadings_ = None
+        self.Y_loadings_ = None
 
     def _pca_decompose(
         self, raw_x: np.ndarray, raw_y: np.ndarray
@@ -84,7 +88,11 @@ class perm_CCA(BaseEstimator, TransformerMixin):
             ids = rng.permutation(X.shape[0])
             x_perm = X[ids, :]
             cca_perm, X_perm, Y_perm = self._cca_decompose(x_perm, Y)
-            rs.append(pd.DataFrame(X_perm).corrwith(pd.DataFrame(Y_perm)))
+            rs.append(
+                pd.DataFrame(X_perm).corrwith(
+                    pd.DataFrame(Y_perm), method=self.corr_method
+                )
+            )
         perm_rs = pd.DataFrame(rs)
 
         return perm_rs
@@ -119,12 +127,27 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         cca, X_c, Y_c = self._cca_decompose(X, Y)
 
         # Compute the original correlations
-        orig_rs = [pearsonr(X_c[:, i], Y_c[:, i])[0] for i in range(self.n_comps)]
+        if self.corr_method == "pearson":
+            func = pearsonr
+        elif self.corr_method == "spearman":
+            func = spearmanr
+        elif self.corr_method == "kendall":
+            func = kendalltau
+        else:
+            raise ValueError(
+                f"Correlation method {self.corr_method} not supported. "
+                "Must be 'pearson', 'spearman', or 'kendall'. Recommend using 'pearson' for linear CCA"
+            )
+
+        orig_rs = [func(X_c[:, i], Y_c[:, i])[0] for i in range(self.n_comps)]
 
         # Perform the permutation test
         perm_rs = self._permute(X, Y)
         p_values = self._calc_p(perm_rs, orig_rs)
-
+        self.cca_model = cca
+        self.X_c_ = X_c
+        self.Y_c_ = Y_c
+        self.orig_rs_ = orig_rs
         return cca, X_c, Y_c, orig_rs, p_values
 
     def fit(self, X: np.ndarray, Y: np.ndarray):
