@@ -202,8 +202,8 @@ def plot_cca_scatter(transformed_X, transformed_Y, n_comps=1, **kwargs):
 
 
 def plot_cca_weights(
-    weights,
-    labels,
+    weights: List or np.ndarray,
+    labels: List or np.ndarray,
     ax=False,
     display_thresh=0.2,
     show=False,
@@ -211,25 +211,43 @@ def plot_cca_weights(
     scaling_factor=50,
     **kwargs,
 ):
+    if isinstance(weights, list):
+        weights = np.array(weights)
+    elif isinstance(weights, np.ndarray):
+        pass
+    else:
+        raise ValueError("weights must be a list or numpy array")
+    if isinstance(labels, list):
+        labels = np.array(labels)
+    elif isinstance(labels, np.ndarray):
+        pass
+    else:
+        raise ValueError("labels must be a list or numpy array")
+
     xlim = kwargs.get("xlim", (-1, 1))
     xlabel = kwargs.get("xlabel", "")
     title = kwargs.get("title", "")
-    if not ax:
-        fig, ax = plt.subplots(figsize=(8, 5))
+    display_title = kwargs.get("display_title", True)
+    display_label = kwargs.get("display_label", True)
     sns.set_style("white")
     weights = weights.flatten()
+    # get the index of thresholded weights
+    idx = np.where(abs(weights) >= display_thresh)[0]
+    filtered_weights = weights[idx]
+    filtered_labels = labels[idx]
     # Sort weights and labels for X features
-    sorted_indices = np.argsort(weights)
-    sorted_weights = weights[sorted_indices]
-    if labels is not None:
-        sorted_labels = [labels[idx] for idx in sorted_indices]
-
-    # Plot X feature weights
-    ax.set_ylabel("Weights")
+    sorted_indices = np.argsort(filtered_weights)
+    sorted_weights = filtered_weights[sorted_indices]
+    sorted_labels = [filtered_labels[idx] for idx in sorted_indices]
+    if not ax:
+        fig, ax = plt.subplots(figsize=(8, len(sorted_labels) / 2))
     ax.set_xlim(xlim[0], xlim[1])
     ax.set_ylim(-0.5, len(weights) + 0.5)
-    ax.set_xlabel(xlabel)
-    ax.set_title(title)
+    if display_label:
+        ax.set_ylabel("Weights")
+        ax.set_xlabel(xlabel)
+    if display_title:
+        ax.set_title(title)
     # perform min-max scalling for weights
     abs_weights = abs(sorted_weights)
     plot_weights = (abs_weights - abs_weights.min()) / (
@@ -237,8 +255,6 @@ def plot_cca_weights(
     )
     texts = []
     for i, label in enumerate(sorted_labels):
-        if abs(sorted_weights[i]) < display_thresh:
-            continue
         font_size = max(min_font_size, plot_weights[i] * scaling_factor)
         ax.text(
             0,
@@ -264,35 +280,70 @@ def plot_cca_weights(
 
 
 def plot_paired_cca_weights(
-    weights_X,
-    weights_Y,
-    display_thresh=0.2,
-    scaling_factor=30,
-    x_labels=None,
-    y_labels=None,
-    **kwargs,
+    weights_X: np.ndarray or pd.DataFrame,
+    weights_Y: np.ndarray or pd.DataFrame,
+    x_labels: List = None,
+    y_labels: List = None,
+    display_thresh: float = 0.2,
+    scaling_factor: float = 30,
+    subplot_kwargs: dict = None,
 ):
     """
     Plots Canonical Correlation Analysis (CCA) feature weights.
 
     Parameters:
-    weights_X (array-like): Weights for X features.
-    weights_Y (array-like): Weights for Y features.
-    x_labels (list, optional): Labels for X features. Defaults to None.
-    y_labels (list, optional): Labels for Y features. Defaults to None.
-
+    weights_X (array-like): Weights for X features. If passing dataframe, the index represents the feature names.
+    weights_Y (array-like): Weights for Y features. If passing dataframe, the index represents the feature names.
+    x_labels (list): Labels for X features. Defaults to None. None only works with DataFrame.
+    y_labels (list): Labels for Y features. Defaults to None. None only works with DataFrame.
+    display_thresh (float): Threshold for displaying feature weights. Defaults to 0.2.
+    scaling_factor (float): Scaling factor for font size of displayed weights. Defaults to 30.
+    subplot_kwargs (dict, Optional): Default is None, passing to plot_cca_weights() function.
+    **kwargs: Additional arguments Controls the figures.
     Returns:
     None
     """
-    figsize = kwargs.get("fig_size", (10, 5))
+    if isinstance(weights_X, pd.DataFrame):
+        x_labels = weights_X.index
+        weights_X = weights_X.values
+    elif isinstance(weights_X, np.ndarray):
+        pass
+    else:
+        raise TypeError("weights_X must be a numpy array or pandas dataframe.")
+    if isinstance(weights_Y, pd.DataFrame):
+        y_labels = weights_Y.index
+        weights_Y = weights_Y.values
+    elif isinstance(weights_Y, np.ndarray):
+        pass
+    else:
+        raise TypeError("weights_Y must be a numpy array or pandas dataframe.")
+    if x_labels is not None:
+        if not isinstance(x_labels, list):
+            try:
+                x_labels = list(x_labels)
+            except:
+                raise TypeError("x_labels must be a list or can be converted to list.")
+        if len(x_labels) != weights_X.shape[0]:
+            raise ValueError(
+                "The length of x_labels must be equal to the number of rows in weights_X"
+            )
+    else:
+        raise ValueError("x_labels must be provided. What are you plotting then?")
+    if y_labels is not None:
+        if not isinstance(y_labels, list):
+            try:
+                y_labels = list(y_labels)
+            except:
+                raise TypeError("y_labels must be a list or can be converted to list.")
+        if len(y_labels) != weights_Y.shape[0]:
+            raise ValueError(
+                "The length of y_labels must be equal to the number of rows in weights_Y"
+            )
+    else:
+        raise ValueError("x_labels must be provided. What are you plotting then?")
     n_comps = weights_X.shape[1]
-    if x_labels:
-        assert len(x_labels) == weights_X.shape[0]
-    if y_labels:
-        assert len(y_labels) == weights_Y.shape[0]
-
     for i in range(n_comps):
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+        fig, (ax1, ax2) = plt.subplots(1, 2)
         plot_cca_weights(
             weights_X[:, i],
             x_labels,
@@ -303,6 +354,7 @@ def plot_paired_cca_weights(
             xlim=(-1, 1),
             xlabel="X Features",
             title="Component {} X feature weights".format(i + 1),
+            **subplot_kwargs,
         )
         plot_cca_weights(
             weights_Y[:, i],
@@ -313,6 +365,7 @@ def plot_paired_cca_weights(
             scaling_factor=scaling_factor,
             xlabel="Y Features",
             title="Component {} Y feature weights".format(i + 1),
+            **subplot_kwargs,
         )
         plt.tight_layout()
         plt.show()
