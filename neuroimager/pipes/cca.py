@@ -23,7 +23,7 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         correlation_measure: Union[
             str, Callable
         ] = "pearson",  # TODO: implement callable
-        random_state: Optional[int] = None,
+        random_state: Optional[int] = 42,
     ) -> None:
         """
         n_comp : int, optional, default: 1
@@ -78,11 +78,10 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         return p_vals
 
     def _permute(self, X: np.ndarray, Y: np.ndarray):
-        seeds = np.random.randint(0, 100000, self.n_perms)
+        rng = np.random.default_rng(self.random_state)
         rs = []
-        for i, seed in enumerate(seeds):
-            np.random.seed(seed)
-            ids = np.random.permutation(X.shape[0])
+        for _ in range(self.n_perms):
+            ids = rng.permutation(X.shape[0])
             x_perm = X[ids, :]
             cca_perm, X_perm, Y_perm = self._cca_decompose(x_perm, Y)
             rs.append(pd.DataFrame(X_perm).corrwith(pd.DataFrame(Y_perm)))
@@ -145,8 +144,14 @@ class perm_CCA(BaseEstimator, TransformerMixin):
 
     def transform(self, X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Return the original loadings"""
-        X_loadings = self.pca_x_model.components_.T @ self.cca_model.x_loadings_
-        Y_loadings = self.pca_y_model.components_.T @ self.cca_model.y_loadings_
+        if hasattr(self, "pca_x_model"):
+            X_loadings = self.pca_x_model.components_.T @ self.cca_model.x_loadings_
+        else:
+            X_loadings = self.cca_model.x_loadings_
+        if hasattr(self, "pca_y_model"):
+            Y_loadings = self.pca_y_model.components_.T @ self.cca_model.y_loadings_
+        else:
+            Y_loadings = self.cca_model.y_loadings_
         self.x_loadings_ = X_loadings
         self.y_loadings_ = Y_loadings
         return X_loadings, Y_loadings
@@ -281,6 +286,10 @@ def plot_paired_cca_weights(
     """
     figsize = kwargs.get("fig_size", (10, 5))
     n_comps = weights_X.shape[1]
+    if x_labels:
+        assert len(x_labels) == weights_X.shape[0]
+    if y_labels:
+        assert len(y_labels) == weights_Y.shape[0]
 
     for i in range(n_comps):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
