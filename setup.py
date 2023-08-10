@@ -8,7 +8,7 @@ with open(os.path.join(current_dir, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="neuroimager",
-    version="0.1.0",
+    version="0.1.1",
     description="A collection of utilities used for MRI data analysis",
     author="Wetiqe",
     author_email="jzni132134@gmail.com",
@@ -19,11 +19,11 @@ setup(
     install_requires=[
         "matplotlib",
         "numpy",
-        "pandas==1.5.3",
-        "scipy==1.10.1",
+        "pandas",
+        "scipy",
         "pingouin",
         "seaborn",
-        "sklearn",
+        "scikit-learn",
         "nilearn",
         "networkx",
         "munkres",

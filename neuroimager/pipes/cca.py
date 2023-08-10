@@ -165,10 +165,11 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         self.orig_rs_ = orig_rs
         return self
 
-    def transform(self, X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: np.ndarray, Y: np.ndarray):
         """Return the original loadings"""
-        if hasattr(self, "pca_x_model"):
+        if hasattr(self, "pca_x_modarraydel"):
             X_loadings = self.pca_x_model.components_.T @ self.cca_model.x_loadings_
+            X_loadings = self.cca_model.x_loadings_
         else:
             X_loadings = self.cca_model.x_loadings_
         if hasattr(self, "pca_y_model"):
@@ -178,6 +179,36 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         self.x_loadings_ = X_loadings
         self.y_loadings_ = Y_loadings
         return X_loadings, Y_loadings
+
+    def explained_variance_ratio(self) -> Tuple[List[float], List[float]]:
+        """
+        Calculate the explained variance ratio for both X and Y canonical variates.
+
+        Returns
+        -------
+        explained_variance_ratio_X: list of float
+            Explained variance ratio for each component in the X canonical variates.
+        explained_variance_ratio_Y: list of float
+            Explained variance ratio for each component in the Y canonical variates.
+        """
+        if self.X_c_ is None or self.Y_c_ is None:
+            raise RuntimeError(
+                "Please fit the model before calculating explained variance ratio."
+            )
+
+        # Calculate total variance for X and Y canonical variates
+        total_variance_X = np.sum(np.var(self.X_c_, axis=0))
+        total_variance_Y = np.sum(np.var(self.Y_c_, axis=0))
+
+        # Calculate explained variance ratio for each component
+        explained_variance_ratio_X = [
+            np.var(self.X_c_[:, i]) / total_variance_X for i in range(self.n_comps)
+        ]
+        explained_variance_ratio_Y = [
+            np.var(self.Y_c_[:, i]) / total_variance_Y for i in range(self.n_comps)
+        ]
+
+        return explained_variance_ratio_X, explained_variance_ratio_Y
 
 
 def plot_cca_scatter(transformed_X, transformed_Y, n_comps=1, **kwargs):
