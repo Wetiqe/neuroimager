@@ -44,15 +44,18 @@ class AverageNodesTransformer(BaseEstimator, TransformerMixin):
         return average_nodes(X, self.labels)
 
 
-class FlattenLowerTriangular(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        pass
+class LowerTriangular(BaseEstimator, TransformerMixin):
+    def __init__(self, diagonal=False):
+        self.diagonal = diagonal
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        return flatten_lower_triangular(X)
+        return flatten_lower_triangular(X, self.diagonal)
+
+    def inverse_transform(self, X, y=None):
+        return unflatten_lower_triangular(X, self.diagonal)
 
 
 # Part two: functions
@@ -159,7 +162,7 @@ def average_nodes(fc_matrix, labels):
     return averaged_fc_matrix.squeeze()
 
 
-def flatten_lower_triangular(matrix):
+def flatten_lower_triangular(matrix: np.ndarray, diagonal: bool = False):
     """
     This function takes a 2D or 3D numpy array returns a 2D numpy array.
     where each row corresponds to the flattened lower triangular part (diagonal removed) of a matrix in the input.
@@ -174,8 +177,8 @@ def flatten_lower_triangular(matrix):
         matrix = np.array([matrix])
     elif len(matrix.shape) != 3:
         raise ValueError("Input matrix must be 2D or 3D")
-
-    tri_matrices = np.array([np.tril(fc, k=-1) for fc in matrix]).reshape(
+    k = 0 if diagonal else -1
+    tri_matrices = np.array([np.tril(fc, k=k) for fc in matrix]).reshape(
         matrix.shape[0], -1
     )
     flat_matrices = tri_matrices[:, ~np.all(tri_matrices == 0, axis=0)]
@@ -183,7 +186,7 @@ def flatten_lower_triangular(matrix):
     return flat_matrices
 
 
-def unflatten_lower_triangular(flat_matrices):
+def unflatten_lower_triangular(flat_matrices, diagonal: bool = False):
     """
     Reconstructs the lower triangular matrices from their flattened representation.
 
@@ -200,6 +203,7 @@ def unflatten_lower_triangular(flat_matrices):
     if len(flat_matrices.shape) != 2:
         raise ValueError("Input matrix must be 2D")
     m, n = flat_matrices.shape
+    k = 0 if diagonal else -1
 
     def calculate_orig_n(n_nodes):
         discriminant = 1 + 8 * n_nodes
@@ -211,7 +215,7 @@ def unflatten_lower_triangular(flat_matrices):
             return n1, n2
 
     n = int(calculate_orig_n(n)[0])
-    tri_indices = np.tril_indices(n, k=-1)
+    tri_indices = np.tril_indices(n, k=k)
     original_shape_matrices = np.zeros((m, n, n))
 
     for i in range(m):
