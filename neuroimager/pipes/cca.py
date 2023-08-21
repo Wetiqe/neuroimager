@@ -1,5 +1,6 @@
-# TODO: Moving to a separate package
+import warnings
 
+warnings.warn("The functions are improved and moved to a separate package: permcca")
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
@@ -22,7 +23,6 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         pca_y: bool = False,
         pca_x_kwargs: Optional[Dict] = None,
         pca_y_kwargs: Optional[Dict] = None,
-        corr_method: str = "pearson",
         random_state: Optional[int] = 42,
     ) -> None:
         """
@@ -42,7 +42,6 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         default_pca_kwargs = {"n_components": 0.95, "whiten": True}
         self.pca_x_kwargs = pca_x_kwargs if pca_x_kwargs else default_pca_kwargs
         self.pca_y_kwargs = pca_y_kwargs if pca_y_kwargs else default_pca_kwargs
-        self.corr_method = corr_method
         self.cca_model = None
         self.X_c_ = None
         self.Y_c_ = None
@@ -129,19 +128,7 @@ class perm_CCA(BaseEstimator, TransformerMixin):
         cca, X_c, Y_c = self._cca_decompose(X, Y)
 
         # Compute the original correlations
-        if self.corr_method == "pearson":
-            func = pearsonr
-        elif self.corr_method == "spearman":
-            func = spearmanr
-        elif self.corr_method == "kendall":
-            func = kendalltau
-        else:
-            raise ValueError(
-                f"Correlation method {self.corr_method} not supported. "
-                "Must be 'pearson', 'spearman', or 'kendall'. Recommend using 'pearson' for linear CCA"
-            )
-
-        orig_rs = [func(X_c[:, i], Y_c[:, i])[0] for i in range(self.n_comps)]
+        orig_rs = [pearsonr(X_c[:, i], Y_c[:, i])[0] for i in range(self.n_comps)]
 
         # Perform the permutation test
         perm_rs = self._permute(X, Y)
