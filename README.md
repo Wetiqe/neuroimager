@@ -1,37 +1,29 @@
 # Neuroimager
 
-The intetion of this pacakge is to make the crossplatform coding and computing much easier. 
-I am using Linux and the remote HPC systems together and sometimes I may use windows or colab.
-It's not very pleasent to keep things synced. Plus different system may have compatibility issues. 
-Build a package can keep the analysis scripts short and concise.
-
-This package provides some utilities used for MRI data analysis. And some of them also supports SKLearn Pipeline.
-Note this package is mainly warppers of other packages, intended to optimize for neuroimaging analysis 
-(That's why I can this warppers locally). The tools, especially the pipelines are build based on my personal projects,
-so it may not be very general and suits your need. But I will try to make it more general if I am able to do.
+This package provides some utilities used for MRI data analysis. And some of them also support SKLearn Pipeline.
+The tools, especially the pipelines are built based on my personal projects, so it may not be very general and suits your need. But I will try to make it more general if I am able to do.
 
 # NOTE!!! This package is still under development and heavily tested, expected to be unstable when used in your analysis.
 # Aims
-This package aims to make 'standard' neuroimaging analysis more easier. 
-In most cases, it is not suitable for developing new analysis pipeline, but some handy small functions may 
-still be helpful to you. Such as atalas operation, permutation based statistics, matrix transformation etc.
+This package aims to make 'standard' neuroimaging analysis easier. 
+In most cases, it is not suitable for developing a new analysis pipeline, but some handy small functions may 
+still be helpful to you. Such as atlas operation, permutation-based statistics, matrix transformation, etc.
 
 ## Main Functions
-* Build warpper classes for some common analysis used in MRI analysis (Actually, in my own analysis)
-* Permutation based statistics for neuroimaging
+* Build wrapper classes for some common analyses used in MRI analysis (Actually, in my own analysis)
+* Permutation-based statatistics
 * Matrix data ML preprocessing and analysis 
 * Nice plotting functions 
 ## Styles
 * Preprocess and analyze data using SKLearn transformer style API (Ideally)
-* Statistical analysis aims to be pingouin style
 * Plotting aims to be seaborn style
 
 ![meme](./assets/images/readme1.jpeg)
 
 # Gallery
-## A Highly Warpped Pipeline for Task-fMRI analysis
+## A Highly Warpped Pipeline for Task-fMRI Analysis
 This is built on top of nilearn pipeline, doing 1st level and 3rd level analysis as defined by FSL.
-Only a few parameters needs to be set, and the pipeline will do the rest. See example scripts for more details.
+Only a few parameters need to be set, and the pipeline will do the rest. See example scripts for more details.
 ```python
 task_pipe = Pipeline(
     [
@@ -65,7 +57,7 @@ results = task_pipe.fit(
 ```
 
 ## Automatic Analysis of HMM model estimated by HMM-MAR
-### Get all model selection metrics and generate a HTML report
+### Get all model selection metrics and generate an HTML report
 
 ```python
 from neuroimager.pipes.hmm import HmmModelSelector
