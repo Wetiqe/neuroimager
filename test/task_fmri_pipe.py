@@ -117,7 +117,7 @@ higher_contrasts = {
 non_parametric = True
 second_level_kwargs = {
     "non_parametric": {
-        "mask": None,
+        "mask_img": None,
         "smoothing_fwhm": None,
         "model_intercept": True,
         "n_perm": 10000,
@@ -129,7 +129,7 @@ second_level_kwargs = {
         "tfce": True,
     },
     "parametric": {
-        "mask": None,
+        "mask_img": None,
         "target_affine": None,
         "target_shape": None,
         "smoothing_fwhm": 6,

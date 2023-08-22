@@ -122,7 +122,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
         display_mode="lyrz",
         report_dims=(1600, 800),
     ):
-        html = fitted_glm.generate_report(
+        report = fitted_glm.generate_report(
             contrasts,
             title=title,
             bg_img=bg_img,
@@ -135,8 +135,7 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
             display_mode=display_mode,
             report_dims=report_dims,
         )
-        with open(self.out_dir + f"{title}report.html", "w") as f:
-            f.write(html)
+        report.save_as_html(self.out_dir + f"{title}report.html")
 
     def plot_single_stat(
         self, stat_map, out_name=None, plot="3D", plot_kwargs=None, save=True
@@ -256,11 +255,11 @@ class FirstLevelPipe(TaskFmri):
         if isinstance(self.contrasts, dict):
             for key, value in self.contrasts.items():
                 self.to_second_level[key] = []
-        elif isinstance(self.contrasts, list):
+        elif isinstance(self.contrasts, (list, np.ndarray, pd.Series)):
             for contrast in self.contrasts:
                 self.to_second_level[contrast] = []
         else:
-            raise ValueError("Contrasts must be either dict or list")
+            raise ValueError("Contrasts must be either dict or array-like")
 
     def process_single_subject(
         self,
@@ -397,6 +396,7 @@ class HigherLevelPipe(TaskFmri):
         out_dir: str,
         stat_maps: dict = None,
         non_parametric: bool = False,
+        check_stat_maps: bool = True,
         generate_report: bool = True,
         stat_map_masks: list or dict = None,
         higher_level_kwargs: dict = None,
@@ -423,6 +423,7 @@ class HigherLevelPipe(TaskFmri):
         self.design_matrix = design_matrix
         self.higher_results = {}
         self.nonparametric = non_parametric
+        self.check_stat_maps = check_stat_maps
         self.stat_map_masks = stat_map_masks
         self.model_kwargs = {}
         self.model_kwargs.update(higher_level_kwargs)
@@ -433,7 +434,7 @@ class HigherLevelPipe(TaskFmri):
         if isinstance(self.contrasts, dict):
             for key, value in self.contrasts.items():
                 self.higher_results[key] = []
-        elif isinstance(self.contrasts, list):
+        elif isinstance(self.contrasts, (list, np.ndarray, pd.Series)):
             for contrast in self.contrasts:
                 self.higher_results[contrast] = []
         else:
@@ -449,14 +450,14 @@ class HigherLevelPipe(TaskFmri):
             second_level_model = second_level_model.fit(
                 stat_maps, design_matrix=self.design_matrix
             )
+            higher_level_result = self.loop_all_2level_contrasts_parametric(
+                second_level_model, out_prefix
+            )
             if self.generate_report:
                 self.generate_nilearn_report(
                     second_level_model, self.contrasts, out_prefix
                 )
             del stat_maps
-            higher_level_result = self.loop_all_2level_contrasts_parametric(
-                second_level_model, out_prefix
-            )
         if plot:
             self.plot_higher_level_result(higher_level_result, out_prefix)
 
@@ -503,11 +504,12 @@ class HigherLevelPipe(TaskFmri):
                 for mask, mask_name in zip(masks, masks_names):
                     if masks_names[0] is None:
                         plot_prefix = out_prefix + "_" + contrast_1level
+                        mask = None
                     else:
                         plot_prefix = (
                             out_prefix + "_" + contrast_1level + "_" + mask_name
                         )
-                    mask = rbload_imgs(mask)[0]
+                        mask = rbload_imgs(mask)[0]
                     self.plot_cluster_parametric(
                         returned_dict["z"],
                         mask_img=mask,
@@ -522,7 +524,8 @@ class HigherLevelPipe(TaskFmri):
     def loop_all_1level_contrasts(self):
         for contrast_1level, stat_maps in tqdm(self.stat_maps.items()):
             tqdm.write(f"Processing contrast {contrast_1level}")
-            self.plot_all_stat(stat_maps, contrast_1level, save=True)
+            if self.check_stat_maps:
+                self.plot_all_stat(stat_maps, contrast_1level, save=True)
             out_prefix = contrast_1level
             stat_maps = rbload_imgs(stat_maps)
             group_results = self.process_single_1level_contrast(stat_maps, out_prefix)
@@ -758,7 +761,7 @@ class HigherLevelPipe(TaskFmri):
         plot_kwargs: dict = None,
         save: bool = True,
     ):
-        fig, axes, cidx = None, None, None
+        fig, axes, cidx = None, None, 0
         for idx, stat_map in enumerate(list_stat_maps):
             if idx % 25 == 0:
                 if idx != 0 and save:
