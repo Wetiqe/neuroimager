@@ -1,6 +1,4 @@
 import warnings
-
-warnings.warn("The functions are improved and moved to a separate package: permcca")
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
@@ -11,6 +9,9 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr, spearmanr, kendalltau
 from neuroimager.plotting import density_scatter
+
+
+warnings.warn("The functions are improved and moved to a separate package: permcca")
 
 
 class perm_CCA(BaseEstimator, TransformerMixin):
