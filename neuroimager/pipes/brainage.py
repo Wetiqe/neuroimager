@@ -23,7 +23,9 @@ class BrainAgeGapCorrectionLinear(BaseEstimator, TransformerMixin):
         offset_test = np.array(self.line_reg.predict(test_features)).flatten()
         corrected_age = X - offset_test
         return corrected_age.reshape(-1, 1)
-
+        
+    def fit_transform(self, X, y):
+        return self.fit(X,y).transform(X,y)
 
 def BAG(train_pred, test_pred, train_y, test_y, line_reg_order=1):
     """
