@@ -7,10 +7,11 @@ from sklearn.preprocessing import PolynomialFeatures
 class BrainAgeGapCorrectionLinear(BaseEstimator, TransformerMixin):
     #     References:
     #     Bias-adjustment in neuroimaging-based brain age frameworks: A robust scheme
-    def __init__(self, line_reg_order=1):
+    def __init__(self, line_reg_order=1, out="bag"):
         self.line_reg_order = line_reg_order
         self.line_reg = LinearRegression()
         self.poly = PolynomialFeatures(degree=self.line_reg_order, include_bias=True)
+        self.out = out
 
     def fit(self, X, y):
         line_reg_features = self.poly.fit_transform(y.reshape(-1, 1))
@@ -22,10 +23,16 @@ class BrainAgeGapCorrectionLinear(BaseEstimator, TransformerMixin):
         test_features = self.poly.transform(y.reshape(-1, 1))
         offset_test = np.array(self.line_reg.predict(test_features)).flatten()
         corrected_age = X - offset_test
-        return corrected_age.reshape(-1, 1)
-        
+
+        if self.out == "age":
+            return corrected_age.reshape(-1, 1)
+        elif self.out == "bag":
+            bag = corrected_age - y
+            return bag.reshape(-1, 1)
+
     def fit_transform(self, X, y):
-        return self.fit(X,y).transform(X,y)
+        return self.fit(X, y).transform(X, y)
+
 
 def BAG(train_pred, test_pred, train_y, test_y, line_reg_order=1):
     """
