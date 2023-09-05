@@ -4,6 +4,8 @@ import numpy as np
 import nibabel as nib
 from nilearn.image import index_img, load_img, resample_to_img
 from neuroimager.utils.rbload import rbload_imgs
+from typing import List
+import warnings
 
 
 def symmetrize_image_data(image_data, round: int or False = False):
@@ -33,10 +35,11 @@ def symmetrize_image_nifti(input_file, output_paths: str or list = None):
         save = True
     elif isinstance(output_paths, list):
         save = True
-    if len(output_paths) != len(nifti_images):
-        raise ValueError(
-            "The number of output paths must match the number of input images."
-        )
+    if save:
+        if len(output_paths) != len(nifti_images):
+            raise ValueError(
+                "The number of output paths must match the number of input images."
+            )
     symmetrized_nifti_images = []
     for i, nifti_image in enumerate(nifti_images):
         image_data = nifti_image.get_fdata()
@@ -77,8 +80,31 @@ def resample_masks(source_img_name, target_img_name, interpolation="continuous")
         return res_img
 
 
-# TODO: Add support for nilean atlas objects
-def combine_atlases(atlases: list, output_path: str, return_combined_atlas=True):
+def _check_combine_input(atlases: List[str or nib.nifti1.Nifti1Image]):
+    affine = None
+    header = None
+    # TODO: Need to check Header?
+    atlases_ls = rbload_imgs(atlases)
+    reference = atlases_ls[0]
+    atlas_imgs = []
+    for idx, atlas in enumerate(atlases_ls):
+        if affine is None:
+            affine = atlas.affine
+            header = atlas.header
+        else:
+            if not (atlas.affine == affine).all():
+                warnings.warn(
+                    f"Affine matrix mismatch in {atlases[idx]}, resampling in reference to the first image"
+                )
+                from nilearn.image import resample_to_img
+
+                atlas = resample_to_img(atlas, reference)
+        atlas_imgs.append(atlas)
+
+    return atlas_imgs, affine, header
+
+
+def combine_atlases(atlases: List[str or nib.nifti1.Nifti1Image], output_path: str):
     """
     This function combines multiple atlas files (in NIfTI format) into a single atlas file.
     Prioritize atlases in the atlas_paths list by placing them at the front.
@@ -109,44 +135,32 @@ def combine_atlases(atlases: list, output_path: str, return_combined_atlas=True)
         """Prioritize atlases in the atlas_paths list by placing them at the front.
         The function will assign the first non-zero value to a voxel if there is an overlap."""
     )
+
+    atlas_imgs, affine, header = rbload_imgs(atlases)
+
     combined_data = None
     max_label = 0
-    affine = None
-    header = None
-
-    for atlas_file in atlases:
-        if isinstance(atlas_file, str):
-            atlas = nib.load(atlas_file)
-        elif isinstance(atlas_file, nib.nifti1.Nifti1Image):
-            atlas = atlas_file
-        else:
-            raise TypeError(
-                "atlas_paths must be a list of file paths or nib.nifti1.Nifti1Image"
-            )
-        if affine is None:
-            affine = atlas.affine
-            header = atlas.header
-        else:
-            if not (atlas.affine == affine).all():
-                print(f"Error: Affine matrix mismatch in {atlases}")
-
+    for atlas in atlas_imgs:
         atlas_data = atlas.get_fdata().astype(np.int16)
         if combined_data is None:
             combined_data = atlas_data
         else:
             if atlas_data.shape != combined_data.shape:
-                print(f"Error: Dimension mismatch in {atlases}")
+                warnings.warn(f"Dimension mismatch in {atlases}")
 
             atlas_data[atlas_data > 0] += max_label
             combined_data = np.where(combined_data == 0, atlas_data, combined_data)
         max_label = int(combined_data.max())
 
     combined_atlas = nib.Nifti1Image(combined_data, affine, header)
-    nib.save(combined_atlas, output_path)
+    if output_path:
+        nib.save(combined_atlas, output_path)
     return combined_atlas
 
 
-def combine_probabilistic_atlases(atlases: list, output_path: str, thresh=0.25):
+def combine_probabilistic_atlases(
+    atlases: List[str or nib.nifti1.Nifti1Image], output_path: str, thresh=0.25
+):
     """
     This function combines multiple probabilistic atlases into a single atlas by selecting the region with the highest probability for each voxel. The resulting atlas is saved to the specified output path.
     The atlas files must be 4D or 3D probabilistic atlas. The order of the atlases determines the label in the output file.
@@ -167,35 +181,10 @@ def combine_probabilistic_atlases(atlases: list, output_path: str, thresh=0.25):
     Example:
     combined_atlas = combine_probabilistic_atlases(["atlas1.nii.gz", "atlas2.nii.gz"], "combined_atlas.nii.gz", thresh=0.5)
     """
-    combined_data = None
-    affine = None
-    header = None
 
-    # Check if atlas_paths is a list
-    if not isinstance(atlases, list):
-        raise TypeError("atlas_paths must be a list even if you have only one file")
+    atlas_imgs, affine, header = rbload_imgs(atlases)
 
-    # Check if output_path is a string
-    if not isinstance(output_path, str):
-        raise TypeError("output_path must be a string")
-
-    for atlas_file in atlases:
-        if isinstance(atlas_file, str):
-            atlas = nib.load(atlas_file)
-        elif isinstance(atlas_file, nib.nifti1.Nifti1Image):
-            atlas = atlas_file
-        else:
-            raise TypeError(
-                "atlas_paths must be a list of file paths or nib.nifti1.Nifti1Image"
-            )
-
-        if affine is None:
-            affine = atlas.affine
-            header = atlas.header
-        else:
-            if not (atlas.affine == affine).all():
-                print(f"Error: Affine matrix mismatch in {atlas_file}")
-
+    for idx, atlas in enumerate(atlas_imgs):
         atlas_data = atlas.get_fdata()
 
         if atlas_data.ndim == 3:
@@ -204,7 +193,7 @@ def combine_probabilistic_atlases(atlases: list, output_path: str, thresh=0.25):
         elif atlas_data.ndim == 4:
             pass
         else:
-            print(f"Error: Dimension mismatch in {atlas_file}")
+            warnings.warn(f"Dimension mismatch in {atlases[idx]}")
 
         # make sure all the atlas is on the same scale
         # e.g. some range from 1-100, some range from 0-1
@@ -226,14 +215,15 @@ def combine_probabilistic_atlases(atlases: list, output_path: str, thresh=0.25):
     max_prob_region_atlas[mask] = 0
 
     combined_atlas = nib.Nifti1Image(max_prob_region_atlas, affine, header)
-    nib.save(combined_atlas, output_path)
+    if output_path:
+        nib.save(combined_atlas, output_path)
 
     return combined_atlas
 
 
 def filter_rois(
     atlas: str or nib.nifti1.Nifti1Image,
-    rois: list,
+    rois: List[int],
     output_path: str,
     remove: bool = True,
 ):
@@ -253,12 +243,12 @@ def filter_rois(
     Raises:
     ValueError: If the input 'atlas' is not a string or a nibabel image object.
     """
-    if isinstance(atlas, str):
-        atlas_img = nib.load(atlas)
-    elif isinstance(atlas, nib.nifti1.Nifti1Image):
-        atlas_img = atlas
-    else:
-        raise ValueError("atlas must be a string or a nibabel image")
+    atlas_img = rbload_imgs(atlas)[0]
+    # Check if output_path is a string
+    if output_path is None:
+        pass
+    elif not isinstance(output_path, str):
+        raise TypeError("output_path must be a string")
 
     # Turn the specified ROIS into include list
     if remove:
@@ -278,13 +268,13 @@ def filter_rois(
     if dims == 4:
         # Create a new 4D image with only the specified ROIs included
         new_atlas_img = index_img(atlas_img, all_roi_indices)
-        nib.save(new_atlas_img, output_path)
     elif dims == 3:
         # Create a boolean mask with the same shape as atlas_data
         atlas_data = atlas_img.get_fdata()
         mask = np.isin(atlas_data, all_roi_indices)
         new_atlas_data = np.where(mask, atlas_data, 0)
         new_atlas_img = nib.Nifti1Image(new_atlas_data, atlas_img.affine)
+    if output_path:
         nib.save(new_atlas_img, output_path)
 
     return new_atlas_img
