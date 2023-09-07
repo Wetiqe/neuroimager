@@ -5,6 +5,7 @@ from adjustText import adjust_text
 from typing import List, Union
 
 
+# TODO: ADD Docstrings
 def biplot_decompose(
     dim1: Union[List[float], np.ndarray],
     dim2: Union[List[float], np.ndarray],
@@ -31,7 +32,7 @@ def biplot_decompose(
         elif len(input.shape) < 1:
             raise ValueError("input can't be empty")
     if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=(8, 8))
     else:
         fig = None
     if hue is None:
