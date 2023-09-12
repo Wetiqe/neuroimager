@@ -48,6 +48,13 @@ def biplot_decompose(
     ylim = max(abs(dim2)) * padding
     ax.set_xlim(-xlim, xlim)
     ax.set_ylim(-ylim, ylim)
+    if not plot_weights:
+        sns.despine(left=True, right=True, top=True, bottom=True)
+        ax.tick_params(axis="both", which="both", length=0)
+        if display:
+            plt.show()
+        return fig, ax
+
     ax2 = ax.twinx()
     loading_padding = padding + 0.1
     loading_ylim = np.max(np.abs(dim2_weights)) * loading_padding
@@ -107,7 +114,6 @@ def biplot_paired(
     palette: str = "plasma",
     padding: float = 1.2,
     plot_weights: bool = True,
-    display: bool = True,
 ):
     """
 
@@ -145,6 +151,7 @@ def biplot_paired(
                     palette=palette,
                     ax=axes[row_idx, col_idx],
                     padding=padding,
+                    plot_weights=plot_weights,
                     display=False,
                 )
                 ax.set_xlabel(f"X Dimension {col_idx+1}", color="b")
@@ -191,6 +198,7 @@ def biplot_paired(
                     palette=palette,
                     ax=axes[row_idx, col_idx],
                     padding=padding,
+                    plot_weights=plot_weights,
                     display=False,
                 )
                 ax.set_xlabel(f"Y Dimension {col_idx+1}", color="b")
