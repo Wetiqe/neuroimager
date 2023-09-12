@@ -3,6 +3,7 @@ import tqdm
 import warnings
 import pandas as pd
 import nibabel as nib
+import warnings
 
 # def _copy_image(image):
 #     image_data_copy = image.get_fdata().copy()
@@ -10,14 +11,59 @@ import nibabel as nib
 #     return nib.Nifti1Image(image_data_copy, affine_copy)
 
 
-def install_workbench(dir):
-    os.environ["PATH"] += ":/content/workbench/bin_rh_linux64"
-    # https://humanconnectome.org/storage/app/media/workbench/workbench-linux64-v1.5.0.zip
-    # https://humanconnectome.org/storage/app/media/workbench/workbench-mac64-v1.5.0.zip
-    # https://humanconnectome.org/storage/app/media/workbench/workbench-windows64-v1.5.0.zip
-    # !wget --no-check-certificate https://humanconnectome.org/storage/app/media/workbench/workbench-rh_linux64-v1.5.0.zip
-    # !unzip -q workbench-rh_linux64-v1.5.0.zip -d /content
-    # !pip install neuromaps tqdm --quiet
+def install_workbench(path, version="1.5.0", redhat: bool = "warn"):
+    import platform
+    import zipfile
+    import urllib.request
+    from pathlib import Path
+
+    workbench_urls = {
+        "Linux": f"https://humanconnectome.org/storage/app/media/workbench/workbench-linux64-v{version}.zip",
+        "RedHat": f"https://humanconnectome.org/storage/app/media/workbench/workbench-rh_linux64-v{version}.zip",
+        "Darwin": f"https://humanconnectome.org/storage/app/media/workbench/workbench-mac64-v{version}.zip",
+        "Windows": f"https://humanconnectome.org/storage/app/media/workbench/workbench-windows64-v{version}.zip",
+    }
+
+    os_type = platform.system()
+    if os_type == "Linux":
+        distribution = platform.freedesktop_os_release()["ID"]
+        if distribution in ["rhel", "centos", "fedora", "red hat"]:
+            os_type = "RedHat"
+        elif distribution in ["ubuntu", " debian", "arch", "opensuse", "sles"]:
+            os_type = "Linux"
+        else:
+            if redhat == "warn":
+                warnings.warn(
+                    "Your distribution is not support by this function, but you can choose whether this is a RedHat machine or not"
+                )
+                return
+            elif redhat is True:
+                os_type = "RedHat"
+            elif redhat is False:
+                os_type = "Linux"
+
+    workbench_url = workbench_urls.get(os_type, None)
+
+    if workbench_url is None:
+        raise ValueError(f"Unsupported operating system: {os_type}")
+
+    workbench_zip = f"workbench-{os_type.lower()}-v{version}.zip"
+    workbench_dir = Path(path)
+
+    print(f"Downloading {workbench_zip}...")
+    urllib.request.urlretrieve(workbench_url, workbench_zip)
+
+    print(f"Extracting {workbench_zip} to {workbench_dir}...")
+    with zipfile.ZipFile(workbench_zip, "r") as zip_ref:
+        zip_ref.extractall(workbench_dir)
+
+    bin_paths = {
+        "Linux": "bin_linux64",
+        "RedHat": "bin_rh_linux64",
+        "Darwin": "bin_darwin64",
+        "Windows": "bin_windows64",
+    }
+    os.environ["PATH"] += f":{path}/workbench/" + bin_paths[os_type]
 
 
 def compare_all_neuromaps(
@@ -28,6 +74,7 @@ def compare_all_neuromaps(
     return_nulls=True,
     method="linear",
 ):
+    # TODO: change to make use of additional requirements
     try:
         import neuromaps
     except ImportError:

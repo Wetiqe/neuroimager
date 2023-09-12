@@ -31,7 +31,7 @@ setup(
         "pybids",
         "tqdm",
     ],
-    extras_require={"torch": ["torch>=1.0.0"]},
+    extras_require={"torch": ["torch>=1.0.0"], "decoder": ["neuromaps", "nimare"]},
     classifiers=[
         "Development Status :: 1 - Planning",
         "Programming Language :: Python :: 3",

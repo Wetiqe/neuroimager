@@ -17,7 +17,6 @@ def symmetrize_image_data(image_data, round: int or False = False):
     full_symmetrized_data = np.concatenate(
         (symmetrized_data, np.flip(symmetrized_data, axis=0)), axis=0
     )
-
     return full_symmetrized_data
 
 
