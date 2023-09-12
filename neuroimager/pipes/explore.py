@@ -293,12 +293,8 @@ def find_outliers_iqr_method(
     :return data with new feature and number of outlier in each features if new_feature is True, else only number of outlier in each features.
     """
     df = data.copy()
-    q1_each_features = df.quantile(
-        0.25,
-    )
-    q3_each_features = df.quantile(
-        0.75,
-    )
+    q1_each_features = df.quantile(0.25,)
+    q3_each_features = df.quantile(0.75,)
     iqr_each_feature = q3_each_features - q1_each_features
     lower_limit_each_feature = q1_each_features - (iqr_each_feature * 1.5)
     upper_limit_each_feature = q3_each_features + (iqr_each_feature * 1.5)

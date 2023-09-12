@@ -59,13 +59,7 @@ confounds_items = [
 ]
 
 first_contrasts = {
-    "matched-unmatched": np.array(
-        [
-            1.0,
-            -1,
-        ]
-        + [0] * (len(confounds_items) + 6)
-    ),
+    "matched-unmatched": np.array([1.0, -1,] + [0] * (len(confounds_items) + 6)),
 }
 first_level_kwargs = {
     "slice_time_ref": 0.0,
@@ -99,19 +93,10 @@ remove = ["102", "103", "105", "203", "210", "216"]
 hcs = [i for i in prep_fmri if i.get_entities()["subject"].startswith("1")]
 pts = [i for i in prep_fmri if i.get_entities()["subject"].startswith("2")]
 all_img = hcs + pts
-higher_design = pd.DataFrame(
-    [
-        [1] * len(hcs) + [-1] * len(pts),
-    ],
-    index=["HC-PT"],
-).T
+higher_design = pd.DataFrame([[1] * len(hcs) + [-1] * len(pts),], index=["HC-PT"],).T
 
 higher_contrasts = {
-    "HC-PT": np.array(
-        [
-            1.0,
-        ]
-    ),
+    "HC-PT": np.array([1.0,]),
 }
 
 non_parametric = True
@@ -167,6 +152,4 @@ task_pipe = Pipeline(
     ]
 )
 
-results = task_pipe.fit(
-    (all_img, confounds, confounds_items, events),
-)
+results = task_pipe.fit((all_img, confounds, confounds_items, events),)

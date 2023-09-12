@@ -689,11 +689,7 @@ class HmmParser(object):
             model_event = pd.DataFrame(
                 {"onset": onset, "duration": durations, "trial_type": vpath}
             )
-            figs.append(
-                plotting.plot_event(
-                    model_event,
-                )
-            )
+            figs.append(plotting.plot_event(model_event,))
         if len(figs) == 1:
             return figs[0]
         return figs
