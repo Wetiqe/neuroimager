@@ -74,6 +74,11 @@ def compare_all_neuromaps(
     return_nulls=True,
     method="linear",
 ):
+    """
+    This function compares a user map to all available neuromaps returned by `neuromaps.datasets.available_annotations()`
+    If the neuromap is in surface
+
+    """
     # TODO: change to make use of additional requirements
     try:
         import neuromaps
@@ -126,7 +131,9 @@ def compare_all_neuromaps(
         elif space == "civet":
             state_map = transforms.mni152_to_civet(state_map, civet_density=resolution)
         else:
-            raise ValueError(f"space {space} not implemented",)
+            raise ValueError(
+                f"space {space} not implemented",
+            )
 
         rotated = nulls.alexander_bloch(
             neuro_map, atlas=space, density=resolution, n_perm=100, seed=1234
@@ -147,3 +154,45 @@ def compare_all_neuromaps(
     result_df = pd.DataFrame(result)
     result_df.columns = cols
     return result_df
+
+
+def pretrained_neurosynth_model(method='correlation', save_path='./'):
+    import gzip
+    import pickle
+    import requests
+    import os
+
+    # Download and load the decoder
+    url = f'https://raw.githubusercontent.com/wetiqe/neuroimager/main/asset/decoder/neurosynth/{method}_decoder.pkl.gz'
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        if save_path:
+            decoder_path = os.path.join(save_path, f'{method}_decoder.pkl.gz')
+            with open(decoder_path, 'wb') as f:
+                f.write(response.content)
+            with gzip.open(decoder_path, 'rb') as f:
+                decoder = pickle.load(f)
+        else:
+            with gzip.open(response.content, 'rb') as f:
+                decoder = pickle.load(f)
+    else:
+        print(f'Error: Unable to download the file (status code {response.status_code})')
+
+    # Download and load the features
+    url = f'https://raw.githubusercontent.com/wetiqe/neuroimager/main/asset/decoder/neurosynth/selected_features.txt'
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        if save_path:
+            features_path = os.path.join(save_path, 'selected_features.txt')
+            with open(features_path, 'wb') as f:
+                f.write(response.content)
+            with open(features_path, 'r') as f:
+                features = f.read().splitlines()
+        else:
+            features = response.text.splitlines()
+    else:
+        print(f'Error: Unable to download the file (status code {response.status_code})')
+
+    return decoder, features

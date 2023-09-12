@@ -166,15 +166,18 @@ class TaskFmri(BaseEstimator, TransformerMixin, object):
 
         if plot == "3D":
             plot_stat_map(
-                stat_map, **plot_kwargs,
+                stat_map,
+                **plot_kwargs,
             )
         elif plot == "glass":
             plot_glass_brain(
-                stat_map, **plot_kwargs,
+                stat_map,
+                **plot_kwargs,
             )
         elif plot == "surface":
             view_img_on_surf(
-                stat_map, **plot_kwargs,
+                stat_map,
+                **plot_kwargs,
             )
 
         if save:
@@ -286,7 +289,8 @@ class FirstLevelPipe(TaskFmri):
         return subj_results
 
     def loop_all_subjects(
-        self, out_prefixes: List[str] = None,
+        self,
+        out_prefixes: List[str] = None,
     ):
         """
         Conduct first level analysis for all subjects
