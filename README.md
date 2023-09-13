@@ -58,7 +58,9 @@ results = task_pipe.fit(
 
 ## Automatic Analysis of HMM model estimated by HMM-MAR
 ### Get all model selection metrics and generate an HTML report
-
+Convert the `hmm` object derived from the following command of HMM-MAR Toolbox
+`[hmm, Gamma, Xi, vpath] = hmmmar(f,T,options);`
+to a Python Dictionary for further processing
 ```python
 from neuroimager.pipes.hmm import HmmModelSelector
 

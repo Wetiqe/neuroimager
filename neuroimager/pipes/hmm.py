@@ -2,6 +2,7 @@
 # Author: Jianzhang Ni (weitqe@GitHub), UoB & CUHK
 
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -121,11 +122,12 @@ class HmmParser(object):
     @staticmethod
     def convert_hmm(hmm):
         """
-        ***Only tested for FMRI DATA***
+
         Convert the `hmm` object derived from the following command of HMM-MAR Toolbox
         `[hmm, Gamma, Xi, vpath] = hmmmar(f,T,options);`
         to a Python Dictionary for further processing
         """
+        warnings.warn('***Only tested for FMRI DATA***')
         hmm_dict = {}
         hmm_param = [
             "train",
@@ -292,14 +294,14 @@ class HmmParser(object):
     def vpath_fo(self, vpath):
         state_fo = dict()
         length = len(vpath)
-        k_states = len(np.unique(vpath))
+        k_states = self.K # A more robust way compared to HMM-MAR which is similar to np.unique(vpath)
         max_fo = 0
         max_state = 0
         for state in range(1, k_states + 1):
             fo = [np.count_nonzero(vpath == state) / length]
             if fo == np.nan:
                 fo = 0
-            state_fo[f"state{state}_fo"] = fo
+            state_fo[f"vpath_state{state}_fo"] = fo
             if state == 1:
                 max_fo = fo
                 max_state = state
@@ -313,7 +315,7 @@ class HmmParser(object):
     @staticmethod
     def gamma_fo(gamma):
         gamma_fo_array = gamma.sum(axis=0) / gamma.shape[0]
-        state_names = [f"state{i + 1}_fo" for i in range(gamma.shape[1])]
+        state_names = [f"gamma_state{i + 1}_fo" for i in range(gamma.shape[1])]
         gamma_fo_df = pd.DataFrame(gamma_fo_array, index=state_names).T
         gamma_fo_df["gamma_max_fo"] = np.max(gamma_fo_array)
 
@@ -340,19 +342,19 @@ class HmmParser(object):
                         continuous = False
                 except IndexError:
                     pass
-            dic[f"state{state}_visits"] = [visit]
+            dic[f"vpath_state{state}_visits"] = [visit]
 
         return pd.DataFrame.from_dict(dic)
 
     @staticmethod
     def vpath_switch(vpath):
         dic = dict()
-        length = len(vpath)
+        length = len(vpath) - 1
         change = 0
         for i in range(length - 1):
             if vpath[i] != vpath[i + 1]:
                 change += 1
-        dic["switch_rate"] = [change / length]
+        dic["vpath_switch_rate"] = [change / length]
 
         return pd.DataFrame.from_dict(dic)
 
@@ -371,11 +373,11 @@ class HmmParser(object):
                     lifes.append(life)
                     life = 0
             if len(lifes) == 0:
-                dic[f"state{state}_lifetime"] = [0]
+                dic[f"vpath_state{state}_lifetime"] = [0]
             elif mean:
-                dic[f"state{state}_lifetime"] = [np.mean(lifes)]
+                dic[f"vpath_state{state}_lifetime"] = [np.mean(lifes)]
             else:
-                dic[f"state{state}_lifetime"] = [lifes]
+                dic[f"vpath_state{state}_lifetime"] = [lifes]
 
         return pd.DataFrame.from_dict(dic)
 
@@ -394,11 +396,11 @@ class HmmParser(object):
                     intervals.append(interval)
                     interval = 0
             if len(intervals) == 0:
-                dic[f"state{state}_interval"] = [0]
+                dic[f"vpath_state{state}_interval"] = [0]
             elif mean:
-                dic[f"state{state}_interval"] = [np.mean(intervals)]
+                dic[f"vpath_state{state}_interval"] = [np.mean(intervals)]
             else:
-                dic[f"state{state}_interval"] = [intervals]
+                dic[f"vpath_state{state}_interval"] = [intervals]
 
         return pd.DataFrame.from_dict(dic)
 
@@ -750,8 +752,13 @@ class HmmParser(object):
         conns = self.plot_conns()
         conns.savefig(f"{states_out}conns.png")
         plt.close(conns)
-        graph = self.plot_louvain_community(threshold=threshold)
-        graph.savefig(f"{graph_out}Louvain.png")
+        try:
+            community_failed = False
+            graph = self.plot_louvain_community(threshold=threshold)
+            graph.savefig(f"{graph_out}Louvain.png")
+        except:
+            warnings.warn("Error occurred when creating Louvain community plot")
+            community_failed = True
         plt.close(graph)
         if plot_vpath:
             for i, subj_label in enumerate(self.subj_labels):
@@ -770,14 +777,15 @@ class HmmParser(object):
                 <img src="{states_out}conns.png" alt="conns">
                 """
             )
-            f.write(
-                f"""
-                <h1>graph features</h1>
-                <img src="{graph_out}Louvain.png" alt="Louvain">
-                <h1>State visitation path</h1>
-
-                """
-            )
+            if not community_failed:
+                f.write(
+                    f"""
+                    <h1>graph features</h1>
+                    <img src="{graph_out}Louvain.png" alt="Louvain">
+                    <h1>State visitation path</h1>
+    
+                    """
+                )
             # loop through subjects and add the images
             try:
                 for i, subj_label in enumerate(self.subj_labels):
