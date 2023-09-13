@@ -127,7 +127,7 @@ class HmmParser(object):
         `[hmm, Gamma, Xi, vpath] = hmmmar(f,T,options);`
         to a Python Dictionary for further processing
         """
-        warnings.warn('***Only tested for FMRI DATA***')
+        warnings.warn("***Only tested for FMRI DATA***")
         hmm_dict = {}
         hmm_param = [
             "train",
@@ -294,7 +294,9 @@ class HmmParser(object):
     def vpath_fo(self, vpath):
         state_fo = dict()
         length = len(vpath)
-        k_states = self.K # A more robust way compared to HMM-MAR which is similar to np.unique(vpath)
+        k_states = (
+            self.K
+        )  # A more robust way compared to HMM-MAR which is similar to np.unique(vpath)
         max_fo = 0
         max_state = 0
         for state in range(1, k_states + 1):
