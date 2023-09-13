@@ -3,7 +3,13 @@
 This package provides some utilities used for MRI data analysis. And some of them also support SKLearn Pipeline.
 The tools, especially the pipelines are built based on my personal projects, so it may not be very general and suits your need. But I will try to make it more general if I am able to do.
 
-# NOTE!!! This package is still under development and heavily tested, expected to be unstable when used in your analysis.
+## Major Recent Updates:
+* Pretrained neurosynth decoder (nimare correlation decoder) with selected features.
+* Compare all maps provided by neuromaps.
+* Presentation-ready surface plot of brain state map.
+* Biplot for decompose algorithm such as PCS.
+
+## NOTE!!! This package is still under development and heavily tested, expected to be unstable when used in your analysis.
 # Aims
 This package aims to make 'standard' neuroimaging analysis easier. 
 In most cases, it is not suitable for developing a new analysis pipeline, but some handy small functions may 
