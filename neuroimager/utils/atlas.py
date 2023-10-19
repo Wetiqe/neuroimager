@@ -135,8 +135,8 @@ def combine_atlases(atlases: List[str or nib.nifti1.Nifti1Image], output_path: s
         The function will assign the first non-zero value to a voxel if there is an overlap."""
     )
 
-    atlas_imgs, affine, header = rbload_imgs(atlases)
-
+    atlas_imgs = rbload_imgs(atlases)
+    affine, header = atlas_imgs[0].affine, atlas_imgs[0].header
     combined_data = None
     max_label = 0
     for atlas in atlas_imgs:
@@ -181,8 +181,9 @@ def combine_probabilistic_atlases(
     combined_atlas = combine_probabilistic_atlases(["atlas1.nii.gz", "atlas2.nii.gz"], "combined_atlas.nii.gz", thresh=0.5)
     """
 
-    atlas_imgs, affine, header = rbload_imgs(atlases)
-
+    atlas_imgs = rbload_imgs(atlases)
+    affine, header = atlas_imgs[0].affine, atlas_imgs[0].header
+    combined_data = None
     for idx, atlas in enumerate(atlas_imgs):
         atlas_data = atlas.get_fdata()
 
