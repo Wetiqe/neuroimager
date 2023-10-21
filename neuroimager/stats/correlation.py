@@ -22,11 +22,11 @@ def partial_corrs(
     data : pd.DataFrame or np.ndarray
         A 2D Pandas DataFrame or NumPy Array containing the data.
     x_labels : list
-        A list of column indices or names for the independent variables.
+        A list of column names for the independent variables.
     y_labels : list
-        A list of column indices or names for the dependent variables.
+        A list of column names for the dependent variables.
     covariates : list, optional
-        A list of column indices or names for the covariates to control for. Default is None.
+        A list of column names for the covariates to control for. Default is None.
     method : str, optional
         The correlation method to use. Options are 'auto', 'pearson', or 'spearman'. Default is 'auto'.
     semi : bool or str, optional
@@ -69,12 +69,14 @@ def partial_corrs(
             raise ValueError("data must be a 2D Pandas DataFrame or NumPy Array")
     if len(x_labels) == 0 or len(y_labels) == 0:
         raise ValueError("X and Y must be specified")
+    if covars is None:
+        covars = []
     if len(covars) == 0:
         print(
             "You did not specify any covariates, will proceed with simple corrlelation"
         )
-    IVs = data.columns[x_labels]  # independent variables
-    DVs = data.columns[y_labels]  # dependent variables
+    IVs = x_labels  # independent variables
+    DVs = y_labels  # dependent variables
     r_matrix = pd.DataFrame(np.zeros((len(IVs), len(DVs))), index=IVs, columns=DVs)
     p_matrix = r_matrix.copy()
 
@@ -129,7 +131,7 @@ def partial_corrs(
             bools, p_vals = pg.multicomp(p_vals, alpha=0.05, method=correct_method)
         p_matrix.loc[:, y_label] = p_vals
     if correct_p == "global":
-        pvals = p_matrix.values.flatten()
+        p_vals = p_matrix.values.flatten()
         bools, p_vals = pg.multicomp(p_vals, alpha=0.05, method=correct_method)
         p_matrix = pd.DataFrame(
             p_vals.reshape(len(x_labels), len(y_labels)),
