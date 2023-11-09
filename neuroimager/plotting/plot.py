@@ -18,6 +18,41 @@ def get_sig(sig):
     return sig, symbol
 
 
+def two_wayplot(state_number,df,feature='FO'):
+    return None
+    fig, ax = plt.subplots(figsize=(6,5))
+    state = f'state{state_number}'
+    sns.violinplot(x="time", y=f"{state}", hue="Gender", data=df, palette=color, saturation=0.8,width=0.8, dodge=True,hue_order=['F','M'],cut=3,inner='box',)
+    sns.swarmplot(x="time", y=f"{state}", hue="Gender", data=df, palette='RdBu', dodge=True,hue_order=['F','M'] )
+    # plt.ylim(-0.1,0.35)
+    plt.ylabel(f'State {state_number} {feature}')
+    plt.xlabel(f'Time of Day')
+    plt.xticks([0, 1, 2], ['Morning', 'Afternoon', 'Evening'])
+    ax.get_legend().remove()
+    sns.despine(trim=True)
+    plt.tight_layout()
+
+    return fig, ax
+
+
+def two_way_lineplot(state_number,df,feature='FO'):
+    return None
+    fig, ax = plt.subplots(figsize=(6,5))
+    state = f'state{state_number}'
+    sns.pointplot(x="time", y=f"{state}", hue="Gender", data=df, palette=color, saturation=0.9,scale=0.4,errwidth=2, dodge=0.2,hue_order=['F','M'], ci=95,units=f"{state}",capsize=0.2,)
+    sns.swarmplot(x="time", y=f"{state}", hue="Gender", data=df, palette='RdBu', dodge=True,hue_order=['F','M'] )
+    # plt.ylim(-0.1,0.35)
+    plt.ylabel(f'State {state_number} {feature}')
+    plt.xlabel(f'Time of Day')
+    plt.xticks([0, 1, 2], ['Morning', 'Afternoon', 'Evening'])
+    ax.get_legend().remove()
+    sns.despine(trim=True)
+    plt.tight_layout()
+    savefig(f'{state}_{feature}_point')
+    plt.show()
+
+
+
 def density_scatter(
     x, y, reg=True, gaussian_density=True, figsize=(10, 10), display=True, **kwargs
 ):
